@@ -1,0 +1,208 @@
+{
+  "info": {
+    "name": "Promise Service API",
+    "description": "약속 관리 서비스 API JSON 테스트 컬렉션\n이유: 체계적인 API 테스트를 통해 JSON 요청/응답 검증 및 API 문서화",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "123",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "약속 관리",
+      "item": [
+        {
+          "name": "약속 생성",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-ID",
+                "value": "{{userId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman 테스트 약속\",\n  \"description\": \"Postman으로 생성한 약속\",\n  \"meetingTime\": \"2025-08-20T16:00:00\",\n  \"maxParticipants\": 6,\n  \"locationName\": \"신촌역\",\n  \"locationAddress\": \"서울시 서대문구 신촌로\",\n  \"locationCoordinates\": \"{\\\"lat\\\": 37.555946, \\\"lng\\\": 126.936893}\",\n  \"participantUserIds\": [456, 789, 101112]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meetings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meetings"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "약속 목록 조회",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-ID",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/meetings/host",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meetings", "host"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "약속 상세 조회",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-ID",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/meetings/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meetings", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "참여자 관리",
+      "item": [
+        {
+          "name": "참여자 초대",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-ID",
+                "value": "{{userId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userIds\": [999, 888, 777]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meetings/1/participants/invite",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meetings", "1", "participants", "invite"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "참여자 응답",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-ID",
+                "value": "456"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"ACCEPTED\",\n  \"message\": \"참여하겠습니다!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meetings/1/participants/456/response",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meetings", "1", "participants", "456", "response"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "약속 상태 관리",
+      "item": [
+        {
+          "name": "약속 상태 변경",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-ID",
+                "value": "{{userId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CONFIRMED\",\n  \"message\": \"약속이 확정되었습니다!\",\n  \"details\": {\n    \"finalLocation\": \"신촌역 2번 출구\",\n    \"notes\": \"비오면 지하상가에서 만나요\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meetings/1/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meetings", "1", "status"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "검색 및 필터",
+      "item": [
+        {
+          "name": "약속 검색",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-ID",
+                "value": "{{userId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"WAITING\",\n  \"locationName\": \"신촌\",\n  \"startDate\": \"2025-08-20T00:00:00\",\n  \"endDate\": \"2025-08-21T23:59:59\",\n  \"sortBy\": \"MEETING_TIME\",\n  \"sortDirection\": \"ASC\",\n  \"page\": 0,\n  \"size\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meetings/search",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meetings", "search"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+

@@ -1,0 +1,225 @@
+{
+  "PromiseService_API_Samples": {
+    "base_url": "http://localhost:8080",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-User-ID": "123"
+    },
+    
+    "1_약속_생성": {
+      "method": "POST",
+      "endpoint": "/api/meetings",
+      "description": "새로운 약속 생성",
+      "request_body": {
+        "title": "주말 스터디 모임",
+        "description": "Spring Boot 스터디 모임입니다. 함께 공부해요!",
+        "meetingTime": "2025-08-25T14:00:00",
+        "maxParticipants": 8,
+        "locationName": "스타벅스 강남역점",
+        "locationAddress": "서울시 강남구 강남대로 123",
+        "locationCoordinates": "{\"lat\": 37.498095, \"lng\": 127.027621}",
+        "participantUserIds": [456, 789, 101]
+      },
+      "expected_response": {
+        "id": 1,
+        "hostId": 123,
+        "title": "주말 스터디 모임",
+        "description": "Spring Boot 스터디 모임입니다. 함께 공부해요!",
+        "meetingTime": "2025-08-25T14:00:00",
+        "maxParticipants": 8,
+        "status": "WAITING",
+        "locationName": "스타벅스 강남역점",
+        "locationAddress": "서울시 강남구 강남대로 123",
+        "locationCoordinates": "{\"lat\": 37.498095, \"lng\": 127.027621}",
+        "participants": [],
+        "createdAt": "2025-08-20T13:30:00",
+        "updatedAt": "2025-08-20T13:30:00"
+      }
+    },
+
+    "2_약속_조회": {
+      "method": "GET",
+      "endpoint": "/api/meetings/{meetingId}",
+      "description": "특정 약속 정보 조회",
+      "url_example": "/api/meetings/1",
+      "headers": {
+        "X-User-ID": "123"
+      },
+      "expected_response": {
+        "id": 1,
+        "hostId": 123,
+        "title": "주말 스터디 모임",
+        "description": "Spring Boot 스터디 모임입니다. 함께 공부해요!",
+        "meetingTime": "2025-08-25T14:00:00",
+        "maxParticipants": 8,
+        "status": "WAITING",
+        "locationName": "스타벅스 강남역점",
+        "locationAddress": "서울시 강남구 강남대로 123",
+        "locationCoordinates": "{\"lat\": 37.498095, \"lng\": 127.027621}",
+        "participants": [
+          {
+            "id": 1,
+            "userId": 456,
+            "response": "INVITED",
+            "joinedAt": "2025-08-20T13:30:00"
+          }
+        ],
+        "createdAt": "2025-08-20T13:30:00",
+        "updatedAt": "2025-08-20T13:30:00"
+      }
+    },
+
+    "3_방장_약속_목록_조회": {
+      "method": "GET",
+      "endpoint": "/api/meetings/host/{hostId}",
+      "description": "방장이 생성한 약속 목록 조회",
+      "url_example": "/api/meetings/host/123",
+      "expected_response": [
+        {
+          "id": 1,
+          "hostId": 123,
+          "title": "주말 스터디 모임",
+          "status": "WAITING",
+          "meetingTime": "2025-08-25T14:00:00",
+          "locationName": "스타벅스 강남역점",
+          "participants": [],
+          "createdAt": "2025-08-20T13:30:00"
+        },
+        {
+          "id": 2,
+          "hostId": 123,
+          "title": "점심 약속",
+          "status": "CONFIRMED",
+          "meetingTime": "2025-08-22T12:00:00",
+          "locationName": "한식당 명동점",
+          "participants": [],
+          "createdAt": "2025-08-20T14:00:00"
+        }
+      ]
+    },
+
+    "4_참여자_약속_목록_조회": {
+      "method": "GET",
+      "endpoint": "/api/meetings/participant/{userId}",
+      "description": "사용자가 참여한 약속 목록 조회",
+      "url_example": "/api/meetings/participant/456",
+      "expected_response": [
+        {
+          "id": 1,
+          "hostId": 123,
+          "title": "주말 스터디 모임",
+          "status": "WAITING",
+          "meetingTime": "2025-08-25T14:00:00",
+          "locationName": "스타벅스 강남역점",
+          "participants": [
+            {
+              "id": 1,
+              "userId": 456,
+              "response": "ACCEPTED"
+            }
+          ],
+          "createdAt": "2025-08-20T13:30:00"
+        }
+      ]
+    },
+
+    "5_참여자_초대": {
+      "method": "POST",
+      "endpoint": "/api/meetings/{meetingId}/participants/invite",
+      "description": "약속에 추가 참여자 초대",
+      "url_example": "/api/meetings/1/participants/invite",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-User-ID": "123"
+      },
+      "request_body": {
+        "participantUserIds": [202, 303, 404],
+        "message": "함께 스터디해요! 많은 참여 부탁드립니다."
+      },
+      "expected_response": {
+        "meetingId": 1,
+        "invitedCount": 3,
+        "successfulInvites": [202, 303, 404],
+        "failedInvites": [],
+        "message": "초대가 성공적으로 전송되었습니다."
+      }
+    },
+
+    "6_초대_응답": {
+      "method": "PUT",
+      "endpoint": "/api/meetings/{meetingId}/participants/respond",
+      "description": "초대에 대한 응답 (수락/거절)",
+      "url_example": "/api/meetings/1/participants/respond",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-User-ID": "456"
+      },
+      "request_body": {
+        "response": "ACCEPTED"
+      },
+      "response_options": {
+        "response_values": ["ACCEPTED", "REJECTED"],
+        "expected_response": "204 No Content"
+      }
+    },
+
+    "7_약속_삭제": {
+      "method": "DELETE",
+      "endpoint": "/api/meetings/{meetingId}",
+      "description": "약속 삭제 (방장만 가능)",
+      "url_example": "/api/meetings/1",
+      "headers": {
+        "X-User-ID": "123"
+      },
+      "expected_response": "204 No Content"
+    },
+
+    "error_responses": {
+      "403_Forbidden": {
+        "description": "권한 없음",
+        "response": {
+          "code": "FORBIDDEN",
+          "message": "약속 삭제 권한이 없습니다",
+          "status": 403
+        }
+      },
+      "404_Not_Found": {
+        "description": "리소스 없음",
+        "response": {
+          "code": "NOT_FOUND",
+          "message": "약속을 찾을 수 없습니다: 999",
+          "status": 404
+        }
+      },
+      "400_Bad_Request": {
+        "description": "잘못된 요청",
+        "response": {
+          "code": "BAD_REQUEST",
+          "message": "validation failed",
+          "status": 400
+        }
+      }
+    },
+
+    "talend_test_scenarios": [
+      {
+        "scenario": "정상적인 약속 생성 플로우",
+        "steps": [
+          "1. POST /api/meetings - 약속 생성",
+          "2. GET /api/meetings/{id} - 생성된 약속 확인",
+          "3. POST /api/meetings/{id}/participants/invite - 참여자 초대",
+          "4. PUT /api/meetings/{id}/participants/respond - 초대 응답",
+          "5. GET /api/meetings/host/{hostId} - 방장 약속 목록 확인"
+        ]
+      },
+      {
+        "scenario": "에러 케이스 테스트",
+        "steps": [
+          "1. GET /api/meetings/99999 - 존재하지 않는 약속 조회 (404)",
+          "2. DELETE /api/meetings/1 with wrong user - 권한 없는 삭제 시도 (403)",
+          "3. POST /api/meetings with invalid data - 잘못된 데이터 전송 (400)"
+        ]
+      }
+    ]
+  }
+}
