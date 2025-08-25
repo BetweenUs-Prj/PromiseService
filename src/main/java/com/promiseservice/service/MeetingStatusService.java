@@ -42,7 +42,7 @@ public class MeetingStatusService {
             .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
 
         // 방장만 상태 변경 가능
-        if (!meeting.getHostId().equals(userId)) {
+        if (!meeting.isHost(userId)) {
             throw new RuntimeException("약속 상태 변경 권한이 없습니다");
         }
 
@@ -59,12 +59,7 @@ public class MeetingStatusService {
         meeting.setStatus(newStatus);
 
         // 히스토리 기록
-        MeetingHistory history = new MeetingHistory();
-        history.setMeeting(meeting);
-        history.setAction(MeetingHistory.ActionType.STATUS_CHANGED);
-        history.setUserId(userId);
-        history.setDetails("상태 변경: " + previousStatus + " → " + newStatus.name() + 
-                         (request.getReason() != null ? " (사유: " + request.getReason() + ")" : ""));
+        MeetingHistory history = MeetingHistory.updateHistory(meeting, userId);
         historyRepository.save(history);
 
         // 특정 상태 변경 시 추가 처리
@@ -191,6 +186,9 @@ public class MeetingStatusService {
      */
     private void handleStatusSpecificActions(Meeting meeting, Meeting.MeetingStatus newStatus, Long userId) {
         switch (newStatus) {
+            case WAITING:
+                // WAITING 상태는 특별한 처리가 필요하지 않음
+                break;
             case CONFIRMED:
                 handleConfirmedStatus(meeting, userId);
                 break;
@@ -210,13 +208,7 @@ public class MeetingStatusService {
         // 모든 초대된 참여자에게 알림 (실제로는 알림 서비스 호출)
         log.info("약속 확정 - 약속 ID: {}, 제목: {}", meeting.getId(), meeting.getTitle());
         
-        // 히스토리 추가 기록
-        MeetingHistory history = new MeetingHistory();
-        history.setMeeting(meeting);
-        history.setAction(MeetingHistory.ActionType.CONFIRMED);
-        history.setUserId(userId);
-        history.setDetails("약속 확정됨");
-        historyRepository.save(history);
+        // 히스토리 추가 기록 - 별도 히스토리는 추가하지 않음 (이미 updateHistory에서 기록됨)
     }
 
     /**
@@ -226,13 +218,7 @@ public class MeetingStatusService {
         // 모든 참여자에게 취소 알림 (실제로는 알림 서비스 호출)
         log.info("약속 취소 - 약속 ID: {}, 제목: {}", meeting.getId(), meeting.getTitle());
         
-        // 히스토리 추가 기록
-        MeetingHistory history = new MeetingHistory();
-        history.setMeeting(meeting);
-        history.setAction(MeetingHistory.ActionType.CANCELLED);
-        history.setUserId(userId);
-        history.setDetails("약속 취소됨");
-        historyRepository.save(history);
+        // 히스토리 추가 기록 - 별도 히스토리는 추가하지 않음 (이미 updateHistory에서 기록됨)
     }
 
     /**
@@ -242,20 +228,16 @@ public class MeetingStatusService {
         // 약속 완료 처리 (실제로는 완료 후처리 로직)
         log.info("약속 완료 - 약속 ID: {}, 제목: {}", meeting.getId(), meeting.getTitle());
         
-        // 히스토리 추가 기록
-        MeetingHistory history = new MeetingHistory();
-        history.setMeeting(meeting);
-        history.setAction(MeetingHistory.ActionType.COMPLETED);
-        history.setUserId(userId);
-        history.setDetails("약속 완료됨");
-        historyRepository.save(history);
+        // 히스토리 추가 기록 - 별도 히스토리는 추가하지 않음 (이미 updateHistory에서 기록됨)
     }
 
     /**
      * 약속 상태 히스토리 조회
      */
     public List<StatusHistoryResponse> getStatusHistory(Long meetingId) {
-        List<MeetingHistory> history = historyRepository.findByMeetingIdOrderByTimestampDesc(meetingId);
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new IllegalArgumentException("약속을 찾을 수 없습니다: " + meetingId));
+        List<MeetingHistory> history = historyRepository.findByMeetingOrderByTimestampDesc(meeting);
         return history.stream()
             .map(StatusHistoryResponse::from)
             .collect(Collectors.toList());

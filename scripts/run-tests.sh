@@ -67,3 +67,8 @@ echo "- 커버리지 리포트: build/reports/jacoco/test/html/index.html"
 echo ""
 echo "🚀 테스트 실행 완료!"
 
+
+
+
+
+

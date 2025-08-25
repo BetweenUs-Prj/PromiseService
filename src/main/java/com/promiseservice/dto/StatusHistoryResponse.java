@@ -22,10 +22,13 @@ public class StatusHistoryResponse {
         StatusHistoryResponse response = new StatusHistoryResponse();
         response.setId(history.getId());
         response.setAction(history.getAction().name());
-        response.setDetails(history.getDetails());
+        response.setDetails(history.getAction().getDisplayName()); // ActionType의 표시명 사용
         response.setUserId(history.getUserId());
         response.setTimestamp(history.getTimestamp());
         return response;
     }
 }
+
+
+
 

@@ -61,6 +61,7 @@ public class MeetingController {
     /**
      * 방장이 생성한 약속 목록 조회
      * GET /api/meetings/host/{hostId}
+     * 이유: 사용자가 자신이 만든 약속들을 관리할 수 있도록 하기 위해
      */
     @GetMapping("/host/{hostId}")
     public ResponseEntity<List<MeetingResponse>> getMeetingsByHost(@PathVariable Long hostId) {
@@ -97,6 +98,7 @@ public class MeetingController {
     /**
      * 약속 삭제
      * DELETE /api/meetings/{meetingId}
+     * 이유: 방장이 더 이상 필요하지 않은 약속을 삭제할 수 있도록 하기 위해
      */
     @DeleteMapping("/{meetingId}")
     public ResponseEntity<Void> deleteMeeting(
@@ -110,6 +112,49 @@ public class MeetingController {
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
             log.error("약속 삭제 실패 - 약속 ID: {}, 에러: {}", meetingId, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * 약속 정보 수정
+     * PUT /api/meetings/{meetingId}
+     * 이유: 방장이 약속의 세부 정보를 변경할 수 있도록 하기 위해
+     */
+    @PutMapping("/{meetingId}")
+    public ResponseEntity<MeetingResponse> updateMeeting(
+            @PathVariable Long meetingId,
+            @Valid @RequestBody MeetingCreateRequest request,
+            @RequestHeader("X-User-ID") Long userId) {
+        
+        log.info("약속 정보 수정 요청 - 약속 ID: {}, 사용자 ID: {}", meetingId, userId);
+        
+        try {
+            MeetingResponse response = meetingService.updateMeeting(meetingId, request, userId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("약속 정보 수정 실패 - 약속 ID: {}, 에러: {}", meetingId, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * 약속 완료 처리
+     * POST /api/meetings/{meetingId}/complete
+     * 이유: 약속이 끝난 후 완료 상태로 변경하기 위해
+     */
+    @PostMapping("/{meetingId}/complete")
+    public ResponseEntity<MeetingResponse> completeMeeting(
+            @PathVariable Long meetingId,
+            @RequestHeader("X-User-ID") Long userId) {
+        
+        log.info("약속 완료 처리 요청 - 약속 ID: {}, 사용자 ID: {}", meetingId, userId);
+        
+        try {
+            MeetingResponse response = meetingService.completeMeeting(meetingId, userId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("약속 완료 처리 실패 - 약속 ID: {}, 에러: {}", meetingId, e.getMessage());
             throw e;
         }
     }

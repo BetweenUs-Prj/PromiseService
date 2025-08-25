@@ -83,3 +83,5 @@ CREATE TABLE meeting_history (
     INDEX idx_timestamp (timestamp)
 );
 
+
+

@@ -39,9 +39,7 @@ public class MeetingSearchRequest {
     @Size(max = 500, message = "장소명은 500자를 초과할 수 없습니다")
     private String locationName;
 
-    // 방장 ID 기반 필터링
-    // 이유: 특정 사용자가 방장인 약속만 조회할 수 있도록 개인화된 검색 제공
-    private Long hostId;
+
 
     // 참여자 ID 목록 기반 필터링
     // 이유: 특정 사용자들이 참여하는 약속을 찾을 수 있도록 관계 기반 검색 제공

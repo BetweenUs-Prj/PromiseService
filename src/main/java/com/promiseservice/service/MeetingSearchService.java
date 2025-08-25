@@ -110,11 +110,7 @@ public class MeetingSearchService {
             return searchByParticipants(request, pageable);
         }
         
-        // 방장 기반 검색 조건 확인
-        // 이유: 특정 사용자가 방장인 약속을 찾는 개인화된 검색 지원
-        if (request.getHostId() != null) {
-            return searchByHost(request, pageable);
-        }
+        // 방장 기반 검색은 제거됨 (hostId 필드 삭제)
         
         // 기본 검색 (모든 약속)
         // 이유: 검색 조건이 없는 경우 전체 약속 목록을 제공하여 기본적인 조회 기능 보장
@@ -187,12 +183,7 @@ public class MeetingSearchService {
         return createPageFromList(meetings, pageable);
     }
 
-    /**
-     * 방장으로 검색
-     */
-    private Page<Meeting> searchByHost(MeetingSearchRequest request, Pageable pageable) {
-        return meetingRepository.findByHostId(request.getHostId(), pageable);
-    }
+
 
     /**
      * List를 Page로 변환
@@ -247,7 +238,6 @@ public class MeetingSearchService {
         summary.setKeyword(request.getKeyword());
         summary.setStatus(request.getStatus());
         summary.setLocationName(request.getLocationName());
-        summary.setHostId(request.getHostId());
         summary.setSortBy(request.getSortBy());
         summary.setSortOrder(request.getSortOrder());
         
@@ -258,7 +248,6 @@ public class MeetingSearchService {
         if (request.getStartTime() != null) appliedFilters++;
         if (request.getEndTime() != null) appliedFilters++;
         if (request.getLocationName() != null) appliedFilters++;
-        if (request.getHostId() != null) appliedFilters++;
         if (request.getParticipantUserIds() != null && !request.getParticipantUserIds().isEmpty()) appliedFilters++;
         
         summary.setAppliedFilters(appliedFilters);

@@ -211,3 +211,8 @@ pm.environment.set("currentTime", timestamp);
 
 **Talend API Tester로 모든 JSON API가 정상 동작하면 성공! 🎊**
 
+
+
+
+
+

@@ -17,7 +17,6 @@ import java.time.LocalDateTime;
 public class MeetingSummaryResponse {
 
     private Long id;
-    private Long hostId;
     private String title;
     private String description;
     private LocalDateTime meetingTime;
@@ -42,7 +41,6 @@ public class MeetingSummaryResponse {
     public static MeetingSummaryResponse from(Meeting meeting, int currentParticipantCount, boolean isHost) {
         MeetingSummaryResponse response = new MeetingSummaryResponse();
         response.setId(meeting.getId());
-        response.setHostId(meeting.getHostId());
         response.setTitle(meeting.getTitle());
         response.setDescription(meeting.getDescription());
         response.setMeetingTime(meeting.getMeetingTime());

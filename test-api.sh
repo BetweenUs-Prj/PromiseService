@@ -66,3 +66,8 @@ curl -X PUT "$BASE_URL/api/meetings/1/status" \
 echo ""
 echo "✅ API JSON 테스트 완료!"
 
+
+
+
+
+

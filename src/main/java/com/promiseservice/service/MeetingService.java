@@ -17,6 +17,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Meeting 비즈니스 로직을 처리하는 서비스
+ * 이유: 약속 관련 핵심 비즈니스 로직을 캡슐화하고 트랜잭션을 관리하기 위해
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,14 +35,28 @@ public class MeetingService {
 
     /**
      * 약속방 생성
+     * 이유: 사용자가 새로운 약속을 생성하고 다른 사용자들을 초대할 수 있도록 하기 위해
+     * 
+     * @param request 약속 생성 요청 정보
+     * @param hostId 방장 사용자 ID
+     * @return 생성된 약속 정보
      */
     @Transactional
     public MeetingResponse createMeeting(MeetingCreateRequest request, Long hostId) {
         log.info("약속방 생성 시작 - 방장: {}, 제목: {}", hostId, request.getTitle());
 
+        // 방장 사용자 존재 여부 확인
+        if (!userService.existsUser(hostId)) {
+            throw new RuntimeException("존재하지 않는 사용자입니다: " + hostId);
+        }
+
+        // 총 초대 인원 수 검증
+        if (!request.isValidParticipantCount(true)) {
+            throw new RuntimeException("최대 참여자 수를 초과할 수 없습니다");
+        }
+
         // 약속 생성
         Meeting meeting = new Meeting();
-        meeting.setHostId(hostId);
         meeting.setTitle(request.getTitle());
         meeting.setDescription(request.getDescription());
         meeting.setMeetingTime(request.getMeetingTime());
@@ -49,10 +67,12 @@ public class MeetingService {
 
         Meeting savedMeeting = meetingRepository.save(meeting);
 
-        // 방장을 참여자로 추가 (수락 상태)
+        // 방장을 첫 번째 참여자로 추가 (수락 상태)
+        // 이유: 방장은 자동으로 약속에 참여하므로 ACCEPTED 상태로 설정
         MeetingParticipant hostParticipant = new MeetingParticipant();
-        hostParticipant.setMeeting(savedMeeting);
+        hostParticipant.setMeetingId(savedMeeting.getId());
         hostParticipant.setUserId(hostId);
+        hostParticipant.setMeeting(savedMeeting);
         hostParticipant.setResponse(MeetingParticipant.ResponseStatus.ACCEPTED);
         hostParticipant.setJoinedAt(LocalDateTime.now());
         participantRepository.save(hostParticipant);
@@ -68,8 +88,9 @@ public class MeetingService {
                     }
                     
                     MeetingParticipant participant = new MeetingParticipant();
-                    participant.setMeeting(savedMeeting);
+                    participant.setMeetingId(savedMeeting.getId());
                     participant.setUserId(userId);
+                    participant.setMeeting(savedMeeting);
                     participant.setResponse(MeetingParticipant.ResponseStatus.INVITED);
                     participantRepository.save(participant);
                 }
@@ -77,11 +98,7 @@ public class MeetingService {
         }
 
         // 히스토리 기록
-        MeetingHistory history = new MeetingHistory();
-        history.setMeeting(savedMeeting);
-        history.setAction(MeetingHistory.ActionType.CREATED);
-        history.setUserId(hostId);
-        history.setDetails("약속방 생성: " + request.getTitle());
+        MeetingHistory history = MeetingHistory.createHistory(savedMeeting, hostId);
         historyRepository.save(history);
 
         // 약속 생성 알림 전송
@@ -94,6 +111,10 @@ public class MeetingService {
 
     /**
      * 약속방 조회
+     * 이유: 사용자가 특정 약속의 상세 정보를 확인할 수 있도록 하기 위해
+     * 
+     * @param meetingId 약속 ID
+     * @return 약속 정보
      */
     public MeetingResponse getMeeting(Long meetingId) {
         Meeting meeting = meetingRepository.findById(meetingId)
@@ -104,9 +125,13 @@ public class MeetingService {
 
     /**
      * 방장이 생성한 약속 목록 조회
+     * 이유: 사용자가 자신이 만든 약속들을 관리할 수 있도록 하기 위해
+     * 
+     * @param hostId 방장 사용자 ID
+     * @return 약속 목록
      */
     public List<MeetingResponse> getMeetingsByHost(Long hostId) {
-        List<Meeting> meetings = meetingRepository.findByHostIdOrderByCreatedAtDesc(hostId);
+        List<Meeting> meetings = meetingRepository.findMeetingsByHostId(hostId);
         return meetings.stream()
             .map(MeetingResponse::from)
             .collect(Collectors.toList());
@@ -114,6 +139,10 @@ public class MeetingService {
 
     /**
      * 사용자가 참여한 약속 목록 조회
+     * 이유: 사용자가 참여한 모든 약속을 확인하여 일정 관리를 할 수 있도록 하기 위해
+     * 
+     * @param userId 사용자 ID
+     * @return 약속 목록
      */
     public List<MeetingResponse> getMeetingsByParticipant(Long userId) {
         List<Meeting> meetings = meetingRepository.findMeetingsByParticipantUserId(userId);
@@ -124,6 +153,12 @@ public class MeetingService {
 
     /**
      * 약속 상태 변경
+     * 이유: 방장이 약속의 진행 상태를 관리할 수 있도록 하기 위해
+     * 
+     * @param meetingId 약속 ID
+     * @param status 새로운 상태
+     * @param userId 요청 사용자 ID
+     * @return 업데이트된 약속 정보
      */
     @Transactional
     public MeetingResponse updateMeetingStatus(Long meetingId, Meeting.MeetingStatus status, Long userId) {
@@ -131,25 +166,30 @@ public class MeetingService {
             .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
 
         // 권한 확인 (방장만 상태 변경 가능)
-        if (!meeting.getHostId().equals(userId)) {
+        if (!meeting.isHost(userId)) {
             throw new RuntimeException("약속 상태 변경 권한이 없습니다");
         }
 
+        Meeting.MeetingStatus previousStatus = meeting.getStatus();
         meeting.setStatus(status);
 
         // 히스토리 기록
-        MeetingHistory history = new MeetingHistory();
-        history.setMeeting(meeting);
-        history.setAction(MeetingHistory.ActionType.UPDATED);
-        history.setUserId(userId);
-        history.setDetails("약속 상태 변경: " + status.name());
+        MeetingHistory history = MeetingHistory.updateHistory(meeting, userId);
         historyRepository.save(history);
 
+        // 상태 변경 알림 (NotificationService에 구현 필요)
+        // notificationService.sendMeetingStatusChangedNotification(meeting, previousStatus, status);
+
+        log.info("약속 상태 변경 완료 - ID: {}, {} -> {}", meetingId, previousStatus, status);
         return MeetingResponse.from(meeting);
     }
 
     /**
      * 약속 삭제
+     * 이유: 방장이 더 이상 필요하지 않은 약속을 삭제할 수 있도록 하기 위해
+     * 
+     * @param meetingId 약속 ID
+     * @param userId 요청 사용자 ID
      */
     @Transactional
     public void deleteMeeting(Long meetingId, Long userId) {
@@ -157,19 +197,94 @@ public class MeetingService {
             .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
 
         // 권한 확인 (방장만 삭제 가능)
-        if (!meeting.getHostId().equals(userId)) {
+        if (!meeting.isHost(userId)) {
             throw new RuntimeException("약속 삭제 권한이 없습니다");
         }
 
         // 히스토리 기록
-        MeetingHistory history = new MeetingHistory();
-        history.setMeeting(meeting);
-        history.setAction(MeetingHistory.ActionType.CANCELLED);
-        history.setUserId(userId);
-        history.setDetails("약속 삭제");
+        MeetingHistory history = MeetingHistory.cancelHistory(meeting, userId);
         historyRepository.save(history);
+
+        // 삭제 알림 전송 (NotificationService에 구현 필요)
+        // notificationService.sendMeetingCancelledNotification(meeting);
 
         meetingRepository.delete(meeting);
         log.info("약속 삭제 완료 - ID: {}", meetingId);
+    }
+
+    /**
+     * 약속 정보 수정
+     * 이유: 방장이 약속의 세부 정보를 변경할 수 있도록 하기 위해
+     * 
+     * @param meetingId 약속 ID
+     * @param request 수정 요청 정보
+     * @param userId 요청 사용자 ID
+     * @return 수정된 약속 정보
+     */
+    @Transactional
+    public MeetingResponse updateMeeting(Long meetingId, MeetingCreateRequest request, Long userId) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+            .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
+
+        // 권한 확인 (방장만 수정 가능)
+        if (!meeting.isHost(userId)) {
+            throw new RuntimeException("약속 수정 권한이 없습니다");
+        }
+
+        // 현재 참여자 수 확인
+        if (request.getMaxParticipants() < meeting.getCurrentParticipantCount()) {
+            throw new RuntimeException("현재 참여자 수보다 적은 최대 인원으로 변경할 수 없습니다");
+        }
+
+        // 약속 정보 업데이트
+        meeting.setTitle(request.getTitle());
+        meeting.setDescription(request.getDescription());
+        meeting.setMeetingTime(request.getMeetingTime());
+        meeting.setMaxParticipants(request.getMaxParticipants());
+        meeting.setLocationName(request.getLocationName());
+        meeting.setLocationAddress(request.getLocationAddress());
+        meeting.setLocationCoordinates(request.getLocationCoordinates());
+
+        // 히스토리 기록
+        MeetingHistory history = MeetingHistory.updateHistory(meeting, userId);
+        historyRepository.save(history);
+
+        // 수정 알림 전송 (NotificationService에 구현 필요)
+        // notificationService.sendMeetingUpdatedNotification(meeting);
+
+        log.info("약속 정보 수정 완료 - ID: {}", meetingId);
+        return MeetingResponse.from(meeting);
+    }
+
+    /**
+     * 약속 완료 처리
+     * 이유: 약속이 끝난 후 완료 상태로 변경하고 참여자들의 실제 참여 여부를 확인하기 위해
+     * 
+     * @param meetingId 약속 ID
+     * @param userId 요청 사용자 ID
+     * @return 완료 처리된 약속 정보
+     */
+    @Transactional
+    public MeetingResponse completeMeeting(Long meetingId, Long userId) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+            .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
+
+        // 권한 확인 (방장만 완료 처리 가능)
+        if (!meeting.isHost(userId)) {
+            throw new RuntimeException("약속 완료 처리 권한이 없습니다");
+        }
+
+        // 상태를 완료로 변경
+        meeting.setStatus(Meeting.MeetingStatus.COMPLETED);
+
+        // 히스토리 기록
+        MeetingHistory history = MeetingHistory.completeHistory(meeting, userId);
+        historyRepository.save(history);
+
+        // 완료 알림 전송 (NotificationService에 구현 필요)
+        // notificationService.sendMeetingCompletedNotification(meeting);
+
+        log.info("약속 완료 처리 완료 - ID: {}", meetingId);
+        return MeetingResponse.from(meeting);
     }
 }

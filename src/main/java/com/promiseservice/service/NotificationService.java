@@ -5,6 +5,8 @@ import com.promiseservice.domain.entity.Meeting.MeetingStatus;
 import com.promiseservice.domain.repository.MeetingParticipantRepository;
 import com.promiseservice.dto.NotificationRequest;
 import com.promiseservice.dto.NotificationResponse;
+import com.promiseservice.dto.SmsNotificationRequest;
+import com.promiseservice.dto.SmsNotificationResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +22,7 @@ import java.util.stream.Collectors;
 /**
  * 약속 관련 알림을 처리하는 서비스
  * 이유: 약속 상태 변경 시 사용자들에게 적절한 알림을 전송하여 약속 정보를 실시간으로 공유하고 
- * 사용자 참여도를 높이기 위해
+ * 사용자 참여도를 높이기 위해. 푸시 알림과 SMS 알림을 통합하여 중요한 알림을 놓치지 않도록 함
  */
 @Slf4j
 @Service
@@ -29,6 +31,7 @@ public class NotificationService {
 
     private final MeetingParticipantRepository participantRepository;
     private final RestTemplate restTemplate;
+    private final SmsService smsService;
 
     // 알림 서비스 기본 URL
     // 이유: 외부 알림 서비스와의 통신을 위한 엔드포인트 설정
@@ -39,6 +42,11 @@ public class NotificationService {
     // 이유: 알림 서비스의 알림 전송 엔드포인트 경로 설정
     @Value("${notificationservice.api.send:/api/notifications/send}")
     private String notificationSendApiPath;
+
+    // SMS 알림 사용 여부
+    // 이유: 중요한 알림에 대해 SMS 전송 여부를 설정하여 알림 놓침 방지
+    @Value("${notification.sms.enabled:true}")
+    private boolean smsNotificationEnabled;
 
     /**
      * 약속 상태 변경에 따른 알림을 전송하는 메서드
@@ -70,9 +78,15 @@ public class NotificationService {
             NotificationRequest notificationRequest = createNotificationRequest(
                 recipientUserIds, title, content, newStatus.name(), meeting.getId());
 
-            // 알림 전송
-            // 이유: 실제 알림 서비스를 통해 사용자들에게 알림을 전송하기 위해
+            // 푸시 알림 전송
+            // 이유: 실제 알림 서비스를 통해 사용자들에게 푸시 알림을 전송하기 위해
             NotificationResponse response = sendNotification(notificationRequest);
+
+            // SMS 알림 전송 (중요한 상태 변경에 대해)
+            // 이유: 약속 확정, 취소 등 중요한 상태 변경 시 SMS로도 알림을 보내어 사용자가 놓치지 않도록 함
+            if (smsNotificationEnabled && isImportantStatusChange(newStatus)) {
+                sendSmsForStatusChange(recipientUserIds, meeting, previousStatus, newStatus, reason);
+            }
 
             log.info("약속 상태 변경 알림 전송 완료 - 약속 ID: {}, 성공: {}, 실패: {}", 
                     meeting.getId(), response.getSuccessCount(), response.getFailureCount());
@@ -150,8 +164,15 @@ public class NotificationService {
             NotificationRequest notificationRequest = createNotificationRequest(
                 recipientUserIds, title, content, "MEETING_CANCELLED", meeting.getId());
 
-            // 알림 전송
+            // 푸시 알림 전송
             NotificationResponse response = sendNotification(notificationRequest);
+
+            // 긴급 SMS 알림 전송 (약속 취소는 긴급 알림으로 처리)
+            // 이유: 약속 취소는 중요한 정보이므로 SMS로도 즉시 알림을 보내어 참여자들이 놓치지 않도록 함
+            if (smsNotificationEnabled) {
+                String smsMessage = createSmsContentForCancellation(meeting, reason);
+                smsService.sendUrgentSms(recipientUserIds, smsMessage, meeting.getId());
+            }
 
             log.info("약속 취소 알림 전송 완료 - 약속 ID: {}, 성공: {}, 실패: {}", 
                     meeting.getId(), response.getSuccessCount(), response.getFailureCount());
@@ -313,5 +334,164 @@ public class NotificationService {
                 notificationRequest.getRecipientUserIds()
             );
         }
+    }
+
+    /**
+     * 중요한 상태 변경인지 확인하는 메서드
+     * 이유: SMS는 비용이 발생하므로 중요한 상태 변경에만 전송하여 효율적인 알림 운영
+     * 
+     * @param status 새로운 약속 상태
+     * @return 중요한 상태 변경 여부
+     */
+    private boolean isImportantStatusChange(MeetingStatus status) {
+        // 확정, 완료, 취소는 중요한 상태 변경으로 분류
+        return status == MeetingStatus.CONFIRMED || 
+               status == MeetingStatus.COMPLETED || 
+               status == MeetingStatus.CANCELLED;
+    }
+
+    /**
+     * 상태 변경에 대한 SMS를 전송하는 메서드
+     * 이유: 중요한 약속 상태 변경을 SMS로 알려 사용자가 놓치지 않도록 함
+     * 
+     * @param recipientUserIds 수신자 사용자 ID 목록
+     * @param meeting 약속 정보
+     * @param previousStatus 이전 상태
+     * @param newStatus 새로운 상태
+     * @param reason 변경 사유
+     */
+    private void sendSmsForStatusChange(List<Long> recipientUserIds, Meeting meeting, 
+                                      MeetingStatus previousStatus, MeetingStatus newStatus, String reason) {
+        try {
+            String smsMessage = createSmsContentForStatusChange(meeting, previousStatus, newStatus, reason);
+            String smsType = newStatus == MeetingStatus.CANCELLED ? "URGENT" : "NORMAL";
+            
+            SmsNotificationRequest smsRequest = new SmsNotificationRequest();
+            smsRequest.setRecipientUserIds(recipientUserIds);
+            smsRequest.setMessage(smsMessage);
+            smsRequest.setSmsType(smsType);
+            smsRequest.setMeetingId(meeting.getId());
+            smsRequest.setSenderName("약속알림");
+
+            SmsNotificationResponse smsResponse = smsService.sendSmsToUsers(smsRequest);
+            
+            log.info("상태 변경 SMS 전송 완료 - 약속 ID: {}, SMS 성공: {}건, 실패: {}건", 
+                    meeting.getId(), smsResponse.getSuccessCount(), smsResponse.getFailureCount());
+                    
+        } catch (Exception e) {
+            log.error("상태 변경 SMS 전송 실패 - 약속 ID: {}, 에러: {}", meeting.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 상태 변경을 위한 SMS 내용을 생성하는 메서드
+     * 이유: SMS는 글자 수 제한이 있으므로 간결하면서도 핵심 정보를 포함한 메시지 생성
+     * 
+     * @param meeting 약속 정보
+     * @param previousStatus 이전 상태
+     * @param newStatus 새로운 상태
+     * @param reason 변경 사유
+     * @return SMS 메시지 내용
+     */
+    private String createSmsContentForStatusChange(Meeting meeting, MeetingStatus previousStatus, 
+                                                 MeetingStatus newStatus, String reason) {
+        StringBuilder content = new StringBuilder();
+        
+        // SMS는 90자 제한이므로 간결하게 작성
+        content.append("[약속알림] ");
+        content.append(meeting.getTitle());
+        
+        switch (newStatus) {
+            case CONFIRMED:
+                content.append(" 약속이 확정되었습니다! ");
+                break;
+            case COMPLETED:
+                content.append(" 약속이 완료되었습니다. ");
+                break;
+            case CANCELLED:
+                content.append(" 약속이 취소되었습니다. ");
+                break;
+            default:
+                content.append(" 상태가 변경되었습니다. ");
+        }
+        
+        // 약속 시간 추가
+        content.append(meeting.getMeetingTime()
+               .format(java.time.format.DateTimeFormatter.ofPattern("MM/dd HH:mm")));
+        
+        // 사유가 있고 글자 수에 여유가 있으면 추가
+        if (reason != null && !reason.trim().isEmpty() && content.length() < 70) {
+            content.append(" (").append(reason).append(")");
+        }
+        
+        return content.toString();
+    }
+
+    /**
+     * 약속 취소를 위한 SMS 내용을 생성하는 메서드
+     * 이유: 약속 취소는 긴급한 정보이므로 명확하고 간결한 SMS 메시지 생성
+     * 
+     * @param meeting 취소된 약속 정보
+     * @param reason 취소 사유
+     * @return SMS 메시지 내용
+     */
+    private String createSmsContentForCancellation(Meeting meeting, String reason) {
+        StringBuilder content = new StringBuilder();
+        
+        content.append("[긴급알림] ");
+        content.append(meeting.getTitle());
+        content.append(" 약속이 취소되었습니다. ");
+        content.append(meeting.getMeetingTime()
+               .format(java.time.format.DateTimeFormatter.ofPattern("MM/dd HH:mm")));
+        
+        if (reason != null && !reason.trim().isEmpty() && content.length() < 70) {
+            content.append(" 사유: ").append(reason);
+        }
+        
+        return content.toString();
+    }
+
+    /**
+     * SMS 전용 알림을 전송하는 메서드
+     * 이유: 푸시 알림과 별도로 SMS만 전송해야 하는 경우를 위한 독립적인 SMS 전송 기능
+     * 
+     * @param recipientUserIds 수신자 사용자 ID 목록
+     * @param message SMS 메시지 내용
+     * @param meetingId 관련 약속 ID
+     * @param isUrgent 긴급 여부
+     * @return SMS 전송 결과
+     */
+    public SmsNotificationResponse sendSmsOnlyNotification(List<Long> recipientUserIds, String message, 
+                                                          Long meetingId, boolean isUrgent) {
+        if (!smsNotificationEnabled) {
+            log.info("SMS 알림이 비활성화되어 있음");
+            return new SmsNotificationResponse(new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        }
+
+        try {
+            SmsNotificationRequest smsRequest = new SmsNotificationRequest();
+            smsRequest.setRecipientUserIds(recipientUserIds);
+            smsRequest.setMessage(message);
+            smsRequest.setSmsType(isUrgent ? "URGENT" : "NORMAL");
+            smsRequest.setMeetingId(meetingId);
+            smsRequest.setSenderName(isUrgent ? "긴급알림" : "약속알림");
+
+            return smsService.sendSmsToUsers(smsRequest);
+            
+        } catch (Exception e) {
+            log.error("SMS 전용 알림 전송 실패 - 에러: {}", e.getMessage());
+            return new SmsNotificationResponse(new java.util.ArrayList<>(), 
+                recipientUserIds.stream().map(String::valueOf).collect(Collectors.toList()));
+        }
+    }
+
+    /**
+     * SMS 서비스 상태를 확인하는 메서드
+     * 이유: SMS 서비스의 가용성을 확인하여 알림 전송 가능 여부를 판단하기 위해
+     * 
+     * @return SMS 서비스 상태
+     */
+    public boolean checkSmsServiceHealth() {
+        return smsService.checkSmsServiceHealth();
     }
 }

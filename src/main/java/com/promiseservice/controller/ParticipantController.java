@@ -58,7 +58,7 @@ public class ParticipantController {
         log.info("초대 응답 요청 - 약속 ID: {}, 사용자: {}, 응답: {}", meetingId, userId, response);
         
         try {
-            participantService.respondToInvite(meetingId, userId, response);
+            participantService.respondToInvitation(meetingId, userId, response);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("초대 응답 실패 - 에러: {}", e.getMessage());
@@ -157,4 +157,7 @@ public class ParticipantController {
         }
     }
 }
+
+
+
 

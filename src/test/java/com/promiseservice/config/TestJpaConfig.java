@@ -13,3 +13,8 @@ public class TestJpaConfig {
     // JPA Auditing 활성화를 위한 설정 클래스
     // 이유: @CreatedDate, @LastModifiedDate 어노테이션이 정상 동작하도록 하기 위해
 }
+
+
+
+
+

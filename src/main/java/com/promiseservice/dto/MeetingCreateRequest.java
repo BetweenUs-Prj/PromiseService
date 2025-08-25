@@ -12,6 +12,10 @@ import jakarta.validation.constraints.Max;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 약속 생성 요청을 위한 DTO
+ * 이유: 클라이언트로부터 약속 생성에 필요한 정보를 받고 유효성 검증을 수행하기 위해
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,7 +25,7 @@ public class MeetingCreateRequest {
     @Size(max = 255, message = "약속 제목은 255자를 초과할 수 없습니다")
     private String title;
 
-    @Size(max = 1000, message = "약속 설명은 1000자를 초과할 수 없습니다")
+    @Size(max = 2000, message = "약속 설명은 2000자를 초과할 수 없습니다")
     private String description;
 
     @NotNull(message = "약속 시간은 필수입니다")
@@ -31,7 +35,7 @@ public class MeetingCreateRequest {
     @Max(value = 10, message = "최대 참여자 수는 10명을 초과할 수 없습니다")
     private Integer maxParticipants = 10;
 
-    // 장소 정보 (다른 서비스에서 전달받은 정보)
+    // 장소 정보 (LocationService에서 전달받은 정보)
     @NotBlank(message = "장소명은 필수입니다")
     @Size(max = 500, message = "장소명은 500자를 초과할 수 없습니다")
     private String locationName;
@@ -41,8 +45,34 @@ public class MeetingCreateRequest {
 
     private String locationCoordinates; // JSON 형태로 위도,경도
 
-    // 초대할 친구 ID 목록
-    @NotNull(message = "초대할 친구 목록은 필수입니다")
+    // 초대할 친구 ID 목록 (방장은 자동으로 추가되므로 여기에 포함하지 않음)
+    // 이유: 요청을 보내는 사용자가 자동으로 방장이 되고, 추가로 초대할 사용자들만 명시
     private List<Long> participantUserIds;
+
+    /**
+     * 최대 참여자 수 검증
+     * 이유: 초대할 사용자 수가 최대 참여자 수를 초과하지 않도록 검증
+     * 
+     * @param hostIncluded 방장을 포함할지 여부
+     * @return 유효성 검증 결과
+     */
+    public boolean isValidParticipantCount(boolean hostIncluded) {
+        if (participantUserIds == null) {
+            return hostIncluded ? maxParticipants >= 1 : maxParticipants >= 0;
+        }
+        
+        int totalParticipants = participantUserIds.size() + (hostIncluded ? 1 : 0);
+        return totalParticipants <= maxParticipants;
+    }
+
+    /**
+     * 총 초대 인원 수 계산
+     * 이유: 방장 포함 총 인원을 계산하여 제한 검증에 활용
+     * 
+     * @return 총 초대 인원 수 (방장 포함)
+     */
+    public int getTotalInvitedCount() {
+        return (participantUserIds != null ? participantUserIds.size() : 0) + 1; // +1은 방장
+    }
 }
 

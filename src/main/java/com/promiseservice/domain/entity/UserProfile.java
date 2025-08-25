@@ -8,11 +8,12 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
- * UserService의 user_profiles 테이블을 참조하는 엔티티
- * 실제 데이터는 UserService에서 관리되며, PromiseService는 외래키로만 참조
+ * 사용자 프로필 정보를 저장하는 엔티티
+ * 이유: 유저 상세 정보(프로필)을 저장하고 user와 1:1 관계를 유지하기 위해
+ * 각 user_id마다 하나만 존재 가능
  */
 @Entity
-@Table(name = "user_profiles")
+@Table(name = "user_profile")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,14 +27,8 @@ public class UserProfile {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(length = 1000)  // H2 호환을 위해 VARCHAR로 변경
-    private String bio;
-
     @Column
     private String location;
-
-    @Column
-    private String website;
 
     @Column(name = "phone_number")
     private String phoneNumber;
@@ -43,7 +38,7 @@ public class UserProfile {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "preferred_transport")
-    private PreferredTransport preferredTransport;
+    private PreferredTransport preferredTransport = PreferredTransport.WALK;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -51,6 +46,10 @@ public class UserProfile {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /**
+     * 선호 교통수단 열거형
+     * 이유: 약속 장소 추천 시 사용자의 이동 수단을 고려하기 위해
+     */
     public enum PreferredTransport {
         WALK, BICYCLE, PUBLIC_TRANSPORT, CAR, MOTORCYCLE
     }

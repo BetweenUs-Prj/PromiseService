@@ -56,7 +56,6 @@ public class MeetingSearchResponse {
         private String keyword;
         private String status;
         private String locationName;
-        private Long hostId;
         private int appliedFilters;
         private String sortBy;
         private String sortOrder;
