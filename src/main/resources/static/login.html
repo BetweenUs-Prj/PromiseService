@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PromiseService 로그인</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 20px;
+            text-align: center;
+            background: #f5f5f5;
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .kakao-login-btn {
+            display: inline-block;
+            background: #FEE500;
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .kakao-login-btn:hover {
+            background: #FDD835;
+            transform: translateY(-1px);
+        }
+        .description {
+            color: #666;
+            font-size: 14px;
+            margin: 20px 0;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>🎯 PromiseService</h2>
+        <p class="description">
+            약속 알림 서비스를 이용하려면<br>
+            카카오 계정으로 로그인해주세요
+        </p>
+        
+        <!-- UserService(8081)의 OAuth2 엔드포인트로 리다이렉트 -->
+        <!-- target 파라미터에 로그인 완료 후 돌아올 URL 지정 -->
+        <a href="http://localhost:8081/oauth2/authorization/kakao?target=http://localhost:8080/login-done.html" 
+           class="kakao-login-btn">
+            🗨️ 카카오로 로그인하기
+        </a>
+        
+        <p class="description">
+            카카오 로그인 시 카카오톡 메시지 전송 권한이 필요합니다
+        </p>
+    </div>
+
+    <script>
+        // 이미 토큰이 있다면 메인 페이지로 리다이렉트
+        // 이유: 중복 로그인을 방지하고 사용자 경험 개선
+        if (localStorage.getItem('jwt')) {
+            if (confirm('이미 로그인되어 있습니다. 메인 페이지로 이동하시겠습니까?')) {
+                location.href = '/';
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+

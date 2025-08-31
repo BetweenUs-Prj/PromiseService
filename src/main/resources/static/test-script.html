@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>시드 테스트 스크립트</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .script-box {
+            background: #2d2d2d;
+            color: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            margin: 20px 0;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        .btn {
+            background: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin: 5px;
+        }
+        .btn:hover { background: #1976D2; }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 시드 테스트 스크립트</h1>
+        
+        <div class="warning">
+            <strong>⚠️ 중요:</strong> 아래 스크립트는 <strong>브라우저 콘솔</strong>에서만 실행하세요!<br>
+            (F12 → Console 탭에 붙여넣기)
+        </div>
+
+        <h2>📋 실행 순서</h2>
+        <ol>
+            <li><strong>PromiseService(8080) 실행 확인</strong></li>
+            <li><strong>UserService(8081)에서 카카오 로그인</strong> (JWT 토큰 획득)</li>
+            <li><strong>브라우저 콘솔에 아래 스크립트 붙여넣기</strong></li>
+        </ol>
+
+        <h2>🚀 즉시 카카오톡 발송 스크립트 (NEW!)</h2>
+        
+        <div class="script-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">(async () => {
+  const t = new URLSearchParams(location.search).get('token') || localStorage.getItem('jwt');
+  if (!t) return console.error('JWT 없음');
+  localStorage.setItem('jwt', t);
+  const BASE = 'http://localhost:8080';
+  const r = await fetch(BASE + '/api/dev/seed-and-notify-me', { 
+    method:'POST', 
+    headers:{Authorization:'Bearer '+t}
+  });
+  const result = await r.text();
+  console.log('📱 즉시 카톡 발송 결과:', result);
+})();</div>
+
+        <h2>🛠 기존 단계별 테스트 스크립트</h2>
+        
+        <div class="script-box">(async () => {
+  const qs = new URLSearchParams(location.search);
+  const token = qs.get('token') || localStorage.getItem('jwt');
+  if (!token) { console.error('JWT 없음: 먼저 카카오 로그인'); return; }
+  localStorage.setItem('jwt', token);
+
+  const BASE = 'http://localhost:8080';
+  const headers = { Authorization: 'Bearer ' + token };
+
+  const call = async (p, opt={}) => {
+    const r = await fetch(BASE + p, { ...opt, headers:{...headers, ...(opt.headers||{})} });
+    const t = await r.text(); let j; try{ j=JSON.parse(t);}catch{}
+    console.log(`[${r.status}] ${p}`, j ?? t); return {r,j,t};
+  };
+
+  // 0) 서버 연결 확인
+  try { 
+    const ping = await fetch(BASE + '/ping'); 
+    console.log('🏓 서버 연결:', ping.status); 
+  } catch (e) { 
+    console.error('❌ 8080 연결 불가', e); 
+    return; 
+  }
+
+  // 1) 약속 시드 생성
+  console.log('🌱 시드 약속 생성 중...');
+  const seeded = await call('/api/dev/seed-appointment', { method:'POST' });
+  if (!seeded.j?.success) return;
+  
+  // 2) 생성된 약속 확정
+  const id = seeded.j.appointmentId;
+  console.log(`📋 약속 확정 중... (ID: ${id})`);
+  await call(`/api/appointments/${id}/confirm`, { method:'POST' });
+  
+  console.log('🎉 테스트 완료! 카카오톡을 확인해보세요!');
+})();</div>
+
+        <button onclick="copyScript()" class="btn">📋 스크립트 복사</button>
+        <button onclick="runScript()" class="btn">🚀 직접 실행</button>
+
+        <div class="info">
+            <h3>📊 기대 결과</h3>
+            <ul>
+                <li><code>[200] /api/dev/seed-appointment {success: true, appointmentId: 1}</code></li>
+                <li><code>[200] /api/appointments/1/confirm {success: true, ...}</code></li>
+                <li><strong>카카오톡 알림 발송!</strong> 📱</li>
+            </ul>
+        </div>
+
+        <div class="warning">
+            <h3>🔍 체크포인트</h3>
+            <ul>
+                <li>자바 파일은 <strong>서버 소스</strong>에, JS는 <strong>브라우저 콘솔</strong>에</li>
+                <li>PromiseService(8080)가 실행 중이어야 함</li>
+                <li>UserService(8081)와 JWT 시크릿이 동일해야 함</li>
+                <li>컨텍스트 경로가 있으면 BASE URL 수정</li>
+            </ul>
+        </div>
+
+        <h2>🛠️ 서버 매핑 확인</h2>
+        <p>서버 재시작 후 로그에서 다음을 확인하세요:</p>
+        <div class="script-box">Mapped "{[/api/dev/seed-appointment],methods=[POST]}" ...</div>
+    </div>
+
+    <script>
+        function copyScript() {
+            const scriptText = `(async () => {
+  // JWT 준비
+  const qs = new URLSearchParams(location.search);
+  const token = qs.get('token') || localStorage.getItem('jwt');
+  if (!token) { console.error('JWT 없음: 먼저 카카오 로그인 하세요.'); return; }
+  localStorage.setItem('jwt', token);
+
+  const BASE = 'http://localhost:8080';                 // PromiseService 포트
+  const headers = { Authorization: 'Bearer ' + token };
+
+  const call = async (path, opt={}) => {
+    const res = await fetch(BASE + path, { ...opt, headers: { ...headers, ...(opt.headers||{}) }});
+    const text = await res.text(); let json; try { json = JSON.parse(text); } catch {}
+    console.log(\`[\${res.status}] \${path}\`, json ?? text);
+    return { res, json, text };
+  };
+
+  // 1) 약속 시드 생성
+  const seeded = await call('/api/dev/seed-appointment', { method: 'POST' });
+  if (!seeded.json?.success) return;
+
+  // 2) 생성된 약속 확정
+  const id = seeded.json.appointmentId;
+  await call(\`/api/appointments/\${id}/confirm\`, { method: 'POST' });
+})();`;
+
+            navigator.clipboard.writeText(scriptText).then(() => {
+                alert('스크립트가 클립보드에 복사되었습니다! 브라우저 콘솔에 붙여넣으세요.');
+            }).catch(() => {
+                alert('복사 실패. 수동으로 복사해주세요.');
+            });
+        }
+
+        async function runScript() {
+            try {
+                // JWT 준비
+                const qs = new URLSearchParams(location.search);
+                const token = qs.get('token') || localStorage.getItem('jwt');
+                if (!token) { 
+                    alert('JWT 토큰이 없습니다. 먼저 카카오 로그인을 해주세요.'); 
+                    return; 
+                }
+                localStorage.setItem('jwt', token);
+
+                const BASE = 'http://localhost:8080';
+                const headers = { Authorization: 'Bearer ' + token };
+
+                const call = async (path, opt={}) => {
+                    const res = await fetch(BASE + path, { ...opt, headers: { ...headers, ...(opt.headers||{}) }});
+                    const text = await res.text(); 
+                    let json; 
+                    try { json = JSON.parse(text); } catch {}
+                    console.log(`[${res.status}] ${path}`, json ?? text);
+                    return { res, json, text };
+                };
+
+                // 1) 약속 시드 생성
+                console.log('🌱 시드 약속 생성 중...');
+                const seeded = await call('/api/dev/seed-appointment', { method: 'POST' });
+                if (!seeded.json?.success) {
+                    alert('시드 생성 실패: ' + (seeded.json?.message || seeded.text));
+                    return;
+                }
+
+                // 2) 생성된 약속 확정
+                const id = seeded.json.appointmentId;
+                console.log(`📋 약속 확정 중... (ID: ${id})`);
+                const confirmed = await call(`/api/appointments/${id}/confirm`, { method: 'POST' });
+                
+                if (confirmed.res.status === 200) {
+                    alert(`✅ 성공! 약속 ${id}가 확정되었습니다. 카카오톡을 확인해보세요!`);
+                } else {
+                    alert(`❌ 확정 실패: ${confirmed.text}`);
+                }
+
+            } catch (error) {
+                console.error('스크립트 실행 오류:', error);
+                alert('스크립트 실행 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

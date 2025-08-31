@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>로그인 완료 - PromiseService</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 500px;
+            margin: 100px auto;
+            padding: 20px;
+            text-align: center;
+            background: #f5f5f5;
+        }
+        .result-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .success {
+            color: #4CAF50;
+        }
+        .error {
+            color: #f44336;
+        }
+        .token-info {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            border-left: 4px solid #4CAF50;
+        }
+        .action-buttons {
+            margin-top: 30px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #1976D2;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        #loadingMsg {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="result-container">
+        <h2>🎯 PromiseService</h2>
+        <div id="loadingMsg">로그인 처리 중...</div>
+        <div id="resultMsg" style="display: none;"></div>
+        <div id="tokenInfo" style="display: none;"></div>
+        <div id="actionButtons" class="action-buttons" style="display: none;"></div>
+    </div>
+
+    <script>
+        // URL 파라미터에서 로그인 결과 확인
+        // 이유: UserService에서 OAuth2 성공 후 JWT 토큰과 함께 리다이렉트된 결과를 처리
+        function processLoginResult() {
+            const urlParams = new URLSearchParams(location.search);
+            const success = urlParams.get('success') === 'true';
+            const token = urlParams.get('token');
+            const error = urlParams.get('error');
+
+            const loadingMsg = document.getElementById('loadingMsg');
+            const resultMsg = document.getElementById('resultMsg');
+            const tokenInfo = document.getElementById('tokenInfo');
+            const actionButtons = document.getElementById('actionButtons');
+
+            // 로딩 메시지 숨기기
+            loadingMsg.style.display = 'none';
+            resultMsg.style.display = 'block';
+            actionButtons.style.display = 'block';
+
+            if (success && token) {
+                // 로그인 성공 처리
+                // 이유: JWT 토큰을 localStorage에 저장하여 이후 API 호출에서 인증 헤더로 사용
+                try {
+                    localStorage.setItem('jwt', token);
+                    
+                    resultMsg.innerHTML = '<h3 class="success">✅ 로그인 성공!</h3><p>카카오 계정으로 로그인이 완료되었습니다.</p>';
+                    
+                    // 토큰 정보 표시 (디버깅용)
+                    tokenInfo.style.display = 'block';
+                    tokenInfo.innerHTML = `
+                        <strong>저장된 JWT 토큰:</strong><br>
+                        <div style="margin-top: 10px;">${token.substring(0, 50)}...</div>
+                        <small style="color: #666;">토큰이 localStorage에 저장되었습니다</small>
+                    `;
+
+                    // 액션 버튼들
+                    actionButtons.innerHTML = `
+                        <a href="/" class="btn btn-primary">메인 페이지로 이동</a>
+                        <button onclick="testAPI()" class="btn btn-secondary">API 테스트</button>
+                        <button onclick="clearToken()" class="btn btn-secondary">로그아웃</button>
+                    `;
+
+                    // 5초 후 자동 리다이렉트
+                    setTimeout(() => {
+                        if (confirm('메인 페이지로 이동하시겠습니까?')) {
+                            location.href = '/';
+                        }
+                    }, 3000);
+
+                } catch (e) {
+                    console.error('토큰 저장 실패:', e);
+                    resultMsg.innerHTML = '<h3 class="error">❌ 토큰 저장 실패</h3><p>로컬 스토리지에 토큰을 저장하는 중 오류가 발생했습니다.</p>';
+                }
+                
+            } else {
+                // 로그인 실패 처리
+                resultMsg.innerHTML = `
+                    <h3 class="error">❌ 로그인 실패</h3>
+                    <p>카카오 로그인 중 오류가 발생했습니다.</p>
+                    ${error ? `<p>오류: ${error}</p>` : ''}
+                `;
+                
+                actionButtons.innerHTML = `
+                    <a href="/login.html" class="btn btn-primary">다시 로그인</a>
+                    <a href="/" class="btn btn-secondary">메인으로</a>
+                `;
+            }
+
+            // URL 파라미터 정리 (보안상 토큰이 URL에 남지 않도록)
+            // 이유: 브라우저 히스토리에 JWT 토큰이 남는 것을 방지하여 보안성 향상
+            if (token) {
+                const cleanUrl = location.origin + location.pathname;
+                history.replaceState(null, '', cleanUrl);
+            }
+        }
+
+        // API 테스트 함수
+        // 이유: 로그인 완료 후 즉시 API 연동이 정상 작동하는지 확인하기 위해
+        async function testAPI() {
+            try {
+                const token = localStorage.getItem('jwt');
+                if (!token) {
+                    alert('토큰이 없습니다. 다시 로그인해주세요.');
+                    return;
+                }
+
+                const response = await fetch('/api/appointments/1/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                alert('API 테스트 결과:\n' + JSON.stringify(result, null, 2));
+
+            } catch (error) {
+                console.error('API 테스트 실패:', error);
+                alert('API 테스트 실패: ' + error.message);
+            }
+        }
+
+        // 토큰 삭제 (로그아웃)
+        // 이유: 사용자가 로그아웃할 수 있도록 localStorage에서 토큰 제거
+        function clearToken() {
+            if (confirm('로그아웃하시겠습니까?')) {
+                localStorage.removeItem('jwt');
+                alert('로그아웃되었습니다.');
+                location.href = '/login.html';
+            }
+        }
+
+        // 페이지 로드 시 로그인 결과 처리
+        document.addEventListener('DOMContentLoaded', processLoginResult);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+

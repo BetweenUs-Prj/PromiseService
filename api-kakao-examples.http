@@ -1,0 +1,103 @@
+### 카카오톡 알림 시스템 API 테스트 예제
+
+### 1. 카카오톡 알림 전송 (기본)
+POST http://localhost:8080/api/notifications/kakao
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+X-User-ID: 1
+Content-Type: application/json
+
+{
+  "meetingId": 123,
+  "receiverIds": [2, 3, 4]
+}
+
+### 2. 카카오톡 알림 전송 (전체 참여자)
+POST http://localhost:8080/api/notifications/kakao
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+X-User-ID: 1
+Content-Type: application/json
+
+{
+  "meetingId": 123
+}
+
+### 3. 카카오 알림 사용 가능 여부 확인
+GET http://localhost:8080/api/notifications/kakao/availability
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+X-User-ID: 1
+
+### 4. 카카오톡 알림 테스트
+POST http://localhost:8080/api/notifications/kakao/test?meetingId=123&receiverIds=2,3
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+X-User-ID: 1
+
+### 5. 알림 서비스 전체 상태 확인
+GET http://localhost:8080/api/notifications/health
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+
+### 6. 모든 알림 채널 상태 확인
+GET http://localhost:8080/api/notifications/channels/health
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+
+### 응답 예시
+
+# 성공 응답
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "success": true,
+  "sentCount": 3,
+  "totalCount": 3,
+  "failed": [],
+  "message": "모든 메시지가 성공적으로 전송되었습니다"
+}
+
+# 부분 성공 응답
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "success": true,
+  "sentCount": 2,
+  "totalCount": 3,
+  "failed": [
+    {
+      "userId": 4,
+      "reason": "NO_CONSENT"
+    }
+  ],
+  "message": "2/3 메시지가 전송되었습니다"
+}
+
+# 동의 없음 오류
+HTTP/1.1 409 Conflict
+Content-Type: application/json
+
+{
+  "success": false,
+  "error": "CONSENT_REQUIRED",
+  "message": "카카오 기능 사용에 동의하지 않았습니다",
+  "guide": "카카오 로그인 후 알림 전송 권한을 허용해주세요"
+}
+
+# 잘못된 파라미터
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "success": false,
+  "error": "INVALID_PARAMETER",
+  "message": "존재하지 않는 약속입니다: 999"
+}
+
+# 사용 가능 여부 응답
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "available": true,
+  "hasConsent": true,
+  "hasKakaoInfo": true,
+  "message": "카카오톡 알림 전송이 가능합니다"
+}

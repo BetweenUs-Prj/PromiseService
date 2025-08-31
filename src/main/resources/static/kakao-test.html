@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>카카오톡 발송 테스트</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .test-section h2 {
+            color: #495057;
+            margin-top: 0;
+            font-size: 18px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .instructions {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            color: #004085;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+        }
+        .instructions ol {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 카카오톡 발송 테스트</h1>
+        
+        <div class="instructions">
+            <h3>📋 테스트 사전 준비사항</h3>
+            <ol>
+                <li><strong>카카오 로그인</strong>: UserService (8081)에서 카카오 로그인 완료</li>
+                <li><strong>talk_message 권한</strong>: 로그인 시 메시지 발송 권한에 동의</li>
+                <li><strong>액세스 토큰 확보</strong>: 브라우저 개발자 도구에서 토큰 복사</li>
+                <li><strong>서버 실행</strong>: PromiseService (8080) 정상 실행 중</li>
+            </ol>
+        </div>
+
+        <div class="warning">
+            ⚠️ <strong>주의사항</strong>: 실제 카카오톡이 발송되므로 테스트용 계정을 사용하세요.
+        </div>
+
+        <!-- 테스트 1: 간단한 메시지 발송 -->
+        <div class="test-section">
+            <h2>🧪 테스트 1: 간단한 메시지 발송</h2>
+            <div class="form-group">
+                <label for="accessToken1">카카오 액세스 토큰:</label>
+                <input type="text" id="accessToken1" placeholder="Bearer 토큰을 입력하세요" />
+            </div>
+            <button onclick="sendTestMessage()">기본 테스트 메시지 발송</button>
+            <div id="result1" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 테스트 2: 커스텀 메시지 발송 -->
+        <div class="test-section">
+            <h2>📝 테스트 2: 커스텀 메시지 발송</h2>
+            <div class="form-group">
+                <label for="accessToken2">카카오 액세스 토큰:</label>
+                <input type="text" id="accessToken2" placeholder="Bearer 토큰을 입력하세요" />
+            </div>
+            <div class="form-group">
+                <label for="customMessage">메시지 내용:</label>
+                <textarea id="customMessage" placeholder="전송할 메시지를 입력하세요">🎉 커스텀 테스트 메시지
+안녕하세요! 카카오톡 발송 테스트 중입니다.
+시간: 2024-01-20 15:30</textarea>
+            </div>
+            <div class="form-group">
+                <label for="customUrl">링크 URL (선택사항):</label>
+                <input type="text" id="customUrl" value="https://example.com" />
+            </div>
+            <button onclick="sendCustomMessage()">커스텀 메시지 발송</button>
+            <div id="result2" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 테스트 3: 약속 확정 알림 -->
+        <div class="test-section">
+            <h2>📅 테스트 3: 약속 확정 알림 발송</h2>
+            <div class="form-group">
+                <label for="accessToken3">카카오 액세스 토큰:</label>
+                <input type="text" id="accessToken3" placeholder="Bearer 토큰을 입력하세요" />
+            </div>
+            <div class="form-group">
+                <label for="appointmentId">약속 ID:</label>
+                <input type="number" id="appointmentId" value="1" />
+            </div>
+            <button onclick="createAndConfirmAppointment()">약속 생성 + 확정 알림</button>
+            <div id="result3" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 시스템 정보 -->
+        <div class="test-section">
+            <h2>ℹ️ 시스템 정보</h2>
+            <button onclick="getSystemInfo()">테스트 시스템 정보 조회</button>
+            <div id="result4" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // 기본 테스트 메시지 발송
+        async function sendTestMessage() {
+            const token = document.getElementById('accessToken1').value.trim();
+            const resultDiv = document.getElementById('result1');
+            
+            if (!token) {
+                showResult(resultDiv, '❌ 액세스 토큰을 입력해주세요.', 'error');
+                return;
+            }
+            
+            showResult(resultDiv, '🔄 테스트 메시지 발송 중...', 'info');
+            
+            try {
+                const response = await fetch('/api/kakao/test/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `accessToken=${encodeURIComponent(token)}`
+                });
+                
+                const result = await response.json();
+                const status = response.ok ? 'success' : 'error';
+                showResult(resultDiv, JSON.stringify(result, null, 2), status);
+                
+            } catch (error) {
+                showResult(resultDiv, `❌ 오류 발생: ${error.message}`, 'error');
+            }
+        }
+
+        // 커스텀 메시지 발송
+        async function sendCustomMessage() {
+            const token = document.getElementById('accessToken2').value.trim();
+            const message = document.getElementById('customMessage').value.trim();
+            const url = document.getElementById('customUrl').value.trim();
+            const resultDiv = document.getElementById('result2');
+            
+            if (!token || !message) {
+                showResult(resultDiv, '❌ 액세스 토큰과 메시지를 입력해주세요.', 'error');
+                return;
+            }
+            
+            showResult(resultDiv, '🔄 커스텀 메시지 발송 중...', 'info');
+            
+            try {
+                const params = new URLSearchParams({
+                    accessToken: token,
+                    text: message,
+                    url: url || 'https://example.com'
+                });
+                
+                const response = await fetch('/api/kakao/test/send/custom', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: params
+                });
+                
+                const result = await response.json();
+                const status = response.ok ? 'success' : 'error';
+                showResult(resultDiv, JSON.stringify(result, null, 2), status);
+                
+            } catch (error) {
+                showResult(resultDiv, `❌ 오류 발생: ${error.message}`, 'error');
+            }
+        }
+
+        // 약속 생성 + 확정 알림
+        async function createAndConfirmAppointment() {
+            const token = document.getElementById('accessToken3').value.trim();
+            const appointmentId = document.getElementById('appointmentId').value.trim();
+            const resultDiv = document.getElementById('result3');
+            
+            if (!token) {
+                showResult(resultDiv, '❌ 액세스 토큰을 입력해주세요.', 'error');
+                return;
+            }
+            
+            showResult(resultDiv, '🔄 약속 생성 및 확정 알림 발송 중...', 'info');
+            
+            try {
+                // 1단계: 약속 생성 (이미 있다면 스킵)
+                let currentId = appointmentId;
+                if (!currentId) {
+                    showResult(resultDiv, '🔄 1단계: 약속 생성 중...', 'info');
+                    
+                    const createResponse = await fetch('/api/dev/seed-appointment', {
+                        method: 'POST',
+                        headers: {
+                            'X-User-Id': '123'
+                        }
+                    });
+                    
+                    if (createResponse.ok) {
+                        const createResult = await createResponse.json();
+                        currentId = createResult.appointmentId;
+                        showResult(resultDiv, `✅ 1단계 완료: 약속 생성됨 (ID: ${currentId})\n\n🔄 2단계: 확정 알림 발송 중...`, 'info');
+                    } else {
+                        throw new Error('약속 생성 실패');
+                    }
+                } else {
+                    showResult(resultDiv, `🔄 기존 약속 사용 (ID: ${currentId})\n\n🔄 확정 알림 발송 중...`, 'info');
+                }
+                
+                // 2단계: 직접 카카오톡 발송 테스트 (서비스 메서드 직접 호출은 불가하므로 API 통해 테스트)
+                // 실제로는 /api/appointments/{id}/confirm을 호출하면 내부적으로 카카오톡이 발송됨
+                
+                const confirmResponse = await fetch(`/api/appointments/${currentId}/confirm`, {
+                    method: 'POST',
+                    headers: {
+                        'X-User-Id': '123'
+                    }
+                });
+                
+                const confirmResult = await confirmResponse.json();
+                
+                let finalResult = `✅ 약속 확정 완료!\n\n`;
+                finalResult += `📝 확정 결과:\n${JSON.stringify(confirmResult, null, 2)}\n\n`;
+                finalResult += `📱 카카오톡 알림이 발송되었는지 확인해보세요!`;
+                
+                showResult(resultDiv, finalResult, confirmResponse.ok ? 'success' : 'error');
+                
+            } catch (error) {
+                showResult(resultDiv, `❌ 오류 발생: ${error.message}`, 'error');
+            }
+        }
+
+        // 시스템 정보 조회
+        async function getSystemInfo() {
+            const resultDiv = document.getElementById('result4');
+            
+            showResult(resultDiv, '🔄 시스템 정보 조회 중...', 'info');
+            
+            try {
+                const response = await fetch('/api/kakao/test/info');
+                const result = await response.json();
+                showResult(resultDiv, JSON.stringify(result, null, 2), 'success');
+                
+            } catch (error) {
+                showResult(resultDiv, `❌ 오류 발생: ${error.message}`, 'error');
+            }
+        }
+
+        // 결과 표시 헬퍼 함수
+        function showResult(element, message, type) {
+            element.style.display = 'block';
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+
+        // 페이지 로드 시 토큰 입력 필드 동기화
+        document.addEventListener('DOMContentLoaded', function() {
+            const tokenInputs = ['accessToken1', 'accessToken2', 'accessToken3'];
+            
+            tokenInputs.forEach(id => {
+                document.getElementById(id).addEventListener('input', function() {
+                    const value = this.value;
+                    tokenInputs.forEach(otherId => {
+                        if (otherId !== id) {
+                            document.getElementById(otherId).value = value;
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+
+
+
+

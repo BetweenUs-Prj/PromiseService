@@ -1,0 +1,100 @@
+### 약속 초대 및 카카오톡 알림 테스트 플로우
+### 이유: 약속 초대부터 알림 확인까지의 전체 흐름을 테스트하기 위해
+
+@baseUrl = http://localhost:8080
+@hostUserId = 1
+@participantUserId = 2
+
+### ======================================
+### 1단계: 테스트용 약속 생성
+### ======================================
+
+POST {{baseUrl}}/api/dev/seed-appointment
+X-User-ID: {{hostUserId}}
+
+> {%
+    client.global.set("appointmentId", response.body.appointmentId);
+%}
+
+### ======================================
+### 2단계: 약속에 참여자 추가 (초대)
+### ======================================
+
+# 참여자를 INVITED 상태로 추가하는 API 필요 (현재 미구현)
+# TODO: 참여자 초대 API 구현 필요
+
+### ======================================
+### 3단계: 카카오톡 초대 알림 전송
+### ======================================
+
+POST {{baseUrl}}/api/notifications/kakao
+X-User-ID: {{hostUserId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{appointmentId}},
+  "receiverIds": [{{participantUserId}}]
+}
+
+### ======================================
+### 4단계: 참여자의 약속 응답 (수락)
+### ======================================
+
+POST {{baseUrl}}/api/appointments/{{appointmentId}}/respond
+X-User-ID: {{participantUserId}}
+Content-Type: application/json
+
+{
+  "accept": true
+}
+
+### ======================================
+### 5단계: 호스트의 약속 확정
+### ======================================
+
+POST {{baseUrl}}/api/appointments/{{appointmentId}}/confirm
+X-User-ID: {{hostUserId}}
+
+### ======================================
+### 6단계: 확정 알림 전송 확인
+### ======================================
+
+# 로그에서 다음 메시지 확인:
+# "약속 확정 알림 발송 대상: 사용자 ID {participantUserId}"
+
+### ======================================
+### 알림 상태 확인
+### ======================================
+
+GET {{baseUrl}}/api/notifications/kakao/availability
+X-User-ID: {{hostUserId}}
+
+### ======================================
+### 응답 예시
+### ======================================
+
+# 초대 알림 성공:
+# {
+#   "success": true,
+#   "sentCount": 1,
+#   "totalCount": 1,
+#   "failed": [],
+#   "message": "모든 메시지가 성공적으로 전송되었습니다"
+# }
+
+# 응답 성공:
+# {
+#   "success": true,
+#   "message": "약속 참여를 수락했습니다.",
+#   "appointmentId": 1,
+#   "accepted": true
+# }
+
+# 확정 성공:
+# {
+#   "success": true,
+#   "message": "약속이 확정되었습니다. 알림 발송: 성공 1건, 실패 0건",
+#   "appointmentId": 1
+# }
+
+

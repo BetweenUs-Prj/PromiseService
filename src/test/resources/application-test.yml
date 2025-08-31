@@ -1,0 +1,53 @@
+# 테스트 환경 완전 고정 설정
+# 이유: H2와 MySQL을 왔다갔다 하면서 발생하는 스키마 드롭 타이밍 충돌을 방지하기 위해
+
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:promise;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER,USERS,STATUS
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true   # 테이블/컬럼명을 자동으로 `backtick` 처리
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+  flyway:
+    enabled: false   # 테스트에서 마이그레이션 끄기
+  liquibase:
+    enabled: false
+  sql:
+    init:
+      mode: never
+  test:
+    mockmvc:
+      print: SYSTEM_OUT
+
+# 서버 설정
+server:
+  port: 0  # 랜덤 포트로 충돌 방지
+
+# 로깅 설정
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.type.descriptor.sql.BasicBinder: trace
+    com.promiseservice: debug
+
+# 외부 서비스 Mock 설정
+userservice:
+  base-url: http://localhost:8081
+  api:
+    users: /api/users
+    profiles: /api/users/profiles
+
+notificationservice:
+  base-url: http://localhost:8083
+  api:
+    send: /api/notifications/send
+
+
