@@ -18,6 +18,10 @@ configurations {
     compileOnly {
         extendsFrom annotationProcessor
     }
+    // HttpClient 4.x 충돌 방지
+    all {
+        exclude group: 'org.apache.httpcomponents', module: 'httpclient' // 4.x 제외
+    }
 }
 
 repositories {
@@ -28,6 +32,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'  // 임시 비활성화
+    // implementation 'org.springframework.boot:spring-boot-starter-security'      // 임시 비활성화
+    // implementation 'org.springframework.boot:spring-boot-starter-webflux' // WebClient 대신 RestTemplate 사용
+    // Apache HttpClient 대신 Spring Boot 기본 HTTP 클라이언트 사용
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'com.h2database:h2'

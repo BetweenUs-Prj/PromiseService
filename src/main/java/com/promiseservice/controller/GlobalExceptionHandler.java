@@ -15,7 +15,7 @@ import java.util.Map;
  * 글로벌 예외 처리 핸들러
  * 이유: 일관된 에러 응답 형태로 클라이언트에게 명확한 오류 정보를 제공하고 500 에러를 방지하기 위해
  */
-@RestControllerAdvice
+// @RestControllerAdvice  // 임시 비활성화 - 디버깅용
 public class GlobalExceptionHandler {
 
     /**

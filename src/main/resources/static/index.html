@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PromiseService - 약속 알림 서비스</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin: 0;
+        }
+        h2 {
+            color: #444;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 10px;
+        }
+        .login-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .logged-in {
+            background: #e8f5e8;
+            border-left: 4px solid #4CAF50;
+        }
+        .logged-out {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #1976D2;
+        }
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #45a049;
+        }
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+        }
+        .btn-warning:hover {
+            background: #f57c00;
+        }
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        .btn-info:hover {
+            background: #138496;
+        }
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .test-result {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .token-info {
+            background: #f0f8ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 11px;
+            word-break: break-all;
+        }
+        .api-section {
+            margin-top: 30px;
+        }
+        .api-group {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .api-group h3 {
+            margin-top: 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 PromiseService</h1>
+        <p>약속 알림 서비스 관리 대시보드</p>
+    </div>
+
+    <div class="container">
+        <h2>로그인 상태</h2>
+        <div id="loginStatus" class="login-status">
+            <span id="statusText">상태 확인 중...</span>
+            <div id="tokenInfo" style="display: none;"></div>
+        </div>
+        <div id="loginActions"></div>
+    </div>
+
+    <div class="container api-section" id="apiSection" style="display: none;">
+        <h2>API 테스트</h2>
+        
+        <div class="api-group">
+            <h3>👤 사용자 정보 확인</h3>
+            <p>현재 JWT에서 추출되는 사용자 ID와 권한 정보를 확인합니다.</p>
+            <button onclick="testWhoAmI()" class="btn btn-info">내 사용자 정보 확인</button>
+        </div>
+
+        <div class="api-group">
+            <h3>🌱 시드 데이터 생성 (추천)</h3>
+            <p><strong>가장 빠른 테스트 방법!</strong> JWT에서 추출한 사용자 ID로 테스트 약속을 자동 생성합니다.</p>
+            <button onclick="createSeedAppointment()" class="btn btn-success">시드 약속 생성</button>
+        </div>
+
+        <div class="api-group">
+            <h3>📋 약속 확정</h3>
+            <p>약속을 확정하고 참여자들에게 카카오톡 알림을 발송합니다.</p>
+            <button onclick="testConfirmAppointment()" class="btn btn-success">약속 확정 테스트 (ID: 1)</button>
+            <input type="number" id="appointmentIdInput" placeholder="약속 ID" style="margin-left: 10px; padding: 8px; width: 100px;">
+            <button onclick="testConfirmAppointmentCustom()" class="btn btn-success">지정 ID로 확정</button>
+        </div>
+
+        <div class="api-group">
+            <h3>👥 참여자 현황</h3>
+            <p>약속의 참여자 목록과 알림 발송 상태를 조회합니다.</p>
+            <button onclick="testGetParticipants()" class="btn btn-primary">참여자 현황 조회 (ID: 1)</button>
+        </div>
+
+        <div class="api-group">
+            <h3>🔄 알림 재발송</h3>
+            <p>실패한 알림을 선택된 참여자들에게 재발송합니다.</p>
+            <button onclick="testResendNotifications()" class="btn btn-warning">알림 재발송 테스트</button>
+        </div>
+
+        <div class="api-group">
+            <h3>❌ 약속 취소</h3>
+            <p>약속을 취소하고 모든 참여자에게 취소 알림을 발송합니다.</p>
+            <button onclick="testCancelAppointment()" class="btn btn-danger">약속 취소 테스트</button>
+        </div>
+
+        <div class="api-group">
+            <h3>📊 결과</h3>
+            <div id="testResult" class="test-result" style="display: none;"></div>
+            <button onclick="clearResults()" class="btn btn-secondary">결과 지우기</button>
+        </div>
+    </div>
+
+    <!-- API 유틸리티 스크립트 로드 -->
+    <script src="/api.js"></script>
+    
+    <script>
+        // 페이지 초기화
+        function initializePage() {
+            updateLoginStatus();
+        }
+
+        // 로그인 상태 업데이트
+        function updateLoginStatus() {
+            const statusDiv = document.getElementById('loginStatus');
+            const statusText = document.getElementById('statusText');
+            const tokenInfo = document.getElementById('tokenInfo');
+            const loginActions = document.getElementById('loginActions');
+            const apiSection = document.getElementById('apiSection');
+            
+            const token = getToken();
+            
+            if (token) {
+                // 로그인 상태
+                statusDiv.className = 'login-status logged-in';
+                statusText.textContent = '✅ 로그인됨 - JWT 토큰이 저장되어 있습니다';
+                
+                // 토큰 정보 표시
+                tokenInfo.style.display = 'block';
+                tokenInfo.innerHTML = `
+                    <strong>JWT 토큰:</strong><br>
+                    ${token.substring(0, 50)}...
+                    <br><small>총 길이: ${token.length} 문자</small>
+                `;
+                
+                // 로그아웃 버튼
+                loginActions.innerHTML = `
+                    <button onclick="logout()" class="btn btn-secondary">로그아웃</button>
+                    <button onclick="refreshPage()" class="btn btn-primary">새로고침</button>
+                `;
+                
+                // API 테스트 섹션 표시
+                apiSection.style.display = 'block';
+                
+            } else {
+                // 로그아웃 상태
+                statusDiv.className = 'login-status logged-out';
+                statusText.textContent = '⚠️ 로그인 필요 - API 사용을 위해 카카오 로그인이 필요합니다';
+                
+                tokenInfo.style.display = 'none';
+                
+                // 로그인 버튼
+                loginActions.innerHTML = `
+                    <a href="/login.html" class="btn btn-primary">카카오 로그인</a>
+                `;
+                
+                // API 테스트 섹션 숨김
+                apiSection.style.display = 'none';
+            }
+        }
+
+        // 테스트 결과 표시
+        function showResult(title, data) {
+            const resultDiv = document.getElementById('testResult');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const resultText = `[${timestamp}] ${title}\n${JSON.stringify(data, null, 2)}\n\n`;
+            
+            if (resultDiv.style.display === 'none') {
+                resultDiv.textContent = resultText;
+            } else {
+                resultDiv.textContent = resultText + resultDiv.textContent;
+            }
+            
+            resultDiv.style.display = 'block';
+            resultDiv.scrollTop = 0;
+        }
+
+        // 결과 지우기
+        function clearResults() {
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.textContent = '';
+            resultDiv.style.display = 'none';
+        }
+
+        // 페이지 새로고침
+        function refreshPage() {
+            location.reload();
+        }
+
+        // 사용자 정보 확인
+        async function testWhoAmI() {
+            try {
+                showResult('👤 사용자 정보 확인 중...', { status: 'loading' });
+                
+                const response = await fetch('/api/dev/whoami', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + getToken()
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult('✅ 사용자 정보 확인 성공', result);
+                } else {
+                    showResult('❌ 사용자 정보 확인 실패', result);
+                }
+            } catch (error) {
+                showResult('💥 사용자 정보 확인 오류', { error: error.message });
+            }
+        }
+
+        // 시드 API 테스트 함수들
+        async function createSeedAppointment() {
+            try {
+                showResult('🌱 시드 약속 생성 중...', { status: 'loading' });
+                
+                const response = await fetch('/api/dev/seed-appointment', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + getToken(),
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('✅ 시드 약속 생성 성공', result);
+                    
+                    // 자동으로 약속 ID 입력 필드에 설정
+                    const appointmentIdInput = document.getElementById('appointmentIdInput');
+                    if (appointmentIdInput) {
+                        appointmentIdInput.value = result.appointmentId;
+                    }
+                    
+                } else {
+                    showResult('❌ 시드 약속 생성 실패', result);
+                }
+                
+            } catch (error) {
+                showResult('❌ 시드 약속 생성 오류', { error: error.message });
+            }
+        }
+
+
+
+        async function testConfirmAppointmentCustom() {
+            try {
+                const appointmentId = document.getElementById('appointmentIdInput').value;
+                if (!appointmentId) {
+                    alert('약속 ID를 입력해주세요.');
+                    return;
+                }
+                
+                showResult(`약속 확정 API 호출 중... (ID: ${appointmentId})`, { status: 'loading' });
+                const result = await confirmAppointment(parseInt(appointmentId));
+                showResult('✅ 약속 확정 성공', result);
+            } catch (error) {
+                showResult('❌ 약속 확정 실패', { error: error.message });
+            }
+        }
+
+        // API 테스트 함수들
+        async function testConfirmAppointment() {
+            try {
+                showResult('약속 확정 API 호출 중...', { status: 'loading' });
+                const result = await confirmAppointment(1);
+                showResult('✅ 약속 확정 성공', result);
+            } catch (error) {
+                showResult('❌ 약속 확정 실패', { error: error.message });
+            }
+        }
+
+        async function testGetParticipants() {
+            try {
+                showResult('참여자 조회 API 호출 중...', { status: 'loading' });
+                const result = await getParticipants(1);
+                showResult('✅ 참여자 조회 성공', result);
+            } catch (error) {
+                showResult('❌ 참여자 조회 실패', { error: error.message });
+            }
+        }
+
+        async function testResendNotifications() {
+            try {
+                const participantIds = [1]; // 테스트용 참여자 ID
+                showResult('알림 재발송 API 호출 중...', { participantIds });
+                const result = await resendNotifications(1, participantIds);
+                showResult('✅ 알림 재발송 성공', result);
+            } catch (error) {
+                showResult('❌ 알림 재발송 실패', { error: error.message });
+            }
+        }
+
+        async function testCancelAppointment() {
+            if (!confirm('정말로 약속을 취소하시겠습니까?')) {
+                return;
+            }
+            
+            try {
+                const reason = '테스트 목적 취소';
+                showResult('약속 취소 API 호출 중...', { reason });
+                const result = await cancelAppointment(1, reason);
+                showResult('✅ 약속 취소 성공', result);
+            } catch (error) {
+                showResult('❌ 약속 취소 실패', { error: error.message });
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', initializePage);
+    </script>
+</body>
+</html>
+

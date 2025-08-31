@@ -1,0 +1,289 @@
+
+
+
+
+
+
+
+
+### 카카오톡 약속 알림 서비스 테스트 모음
+### 이유: 카카오톡 알림 기능을 HTTP 클라이언트에서 직접 테스트하기 위해
+
+### 환경 변수 설정
+@baseUrl = http://localhost:8080
+@jwtToken = eyJhbGciOiJIUzI1NiJ9...여기에_실제_토큰_입력
+@userId = 1
+@meetingId = 1
+@testMeetingId = 123
+
+### ======================================
+### 1. 서버 상태 확인
+### ======================================
+
+### 기본 헬스 체크
+GET {{baseUrl}}/api/health
+
+### 알림 서비스 상태 확인
+GET {{baseUrl}}/api/notifications/health
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+
+### 모든 알림 채널 상태 확인
+GET {{baseUrl}}/api/notifications/channels/health
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+
+### ======================================
+### 2. 카카오 알림 사용 가능 여부 확인
+### ======================================
+
+### 카카오 알림 사용 가능 여부 확인
+GET {{baseUrl}}/api/notifications/kakao/availability
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+
+### ======================================
+### 3. 카카오톡 알림 전송 테스트 (정상 케이스)
+### ======================================
+
+### 특정 수신자들에게 카카오톡 알림 전송
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": [2, 3, 4]
+}
+
+### 전체 참여자에게 카카오톡 알림 전송 (수신자 ID 없음)
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}}
+}
+
+### 단일 수신자에게 카카오톡 알림 전송
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": [2]
+}
+
+### ======================================
+### 4. 카카오 간단 테스트 엔드포인트
+### ======================================
+
+### GET 방식 간단 테스트 (쿼리 파라미터)
+POST {{baseUrl}}/api/notifications/kakao/test?meetingId={{meetingId}}&receiverIds=2,3,4
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+
+### ======================================
+### 5. 오류 상황 테스트
+### ======================================
+
+### 존재하지 않는 약속 ID로 테스트
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": 99999,
+  "receiverIds": [2, 3]
+}
+
+### 잘못된 수신자 ID 형식
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": ["invalid", "ids"]
+}
+
+### 빈 수신자 목록 (전체 참여자 대상)
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": []
+}
+
+### 수신자 수 제한 초과 테스트 (20명 초과)
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]
+}
+
+### 필수 필드 누락 (meetingId 없음)
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "receiverIds": [2, 3]
+}
+
+### ======================================
+### 6. 인증/인가 테스트
+### ======================================
+
+### JWT 토큰 없이 요청 (401 오류 예상)
+POST {{baseUrl}}/api/notifications/kakao
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": [2, 3]
+}
+
+### 사용자 ID 헤더 없이 요청 (401 오류 예상)
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": [2, 3]
+}
+
+### 잘못된 JWT 토큰으로 요청 (401 오류 예상)
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer invalid_token_here
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": [2, 3]
+}
+
+### ======================================
+### 7. 동의 관련 테스트 (409 오류 예상)
+### ======================================
+
+### 카카오 기능 동의하지 않은 사용자로 테스트
+POST {{baseUrl}}/api/notifications/kakao
+Authorization: Bearer {{jwtToken}}
+X-User-ID: 999
+Content-Type: application/json
+
+{
+  "meetingId": {{meetingId}},
+  "receiverIds": [2, 3]
+}
+
+### ======================================
+### 8. 약속 관련 API 테스트 (추가 참고용)
+### ======================================
+
+### 약속 확정 및 알림 발송
+POST {{baseUrl}}/api/appointments/{{meetingId}}/confirm
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+
+### 약속 취소 및 알림 발송
+POST {{baseUrl}}/api/appointments/{{meetingId}}/cancel
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+
+### 약속 초대 응답 (수락)
+POST {{baseUrl}}/api/appointments/{{meetingId}}/respond
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "accept": true
+}
+
+### 약속 초대 응답 (거절)
+POST {{baseUrl}}/api/appointments/{{meetingId}}/respond
+Authorization: Bearer {{jwtToken}}
+X-User-ID: {{userId}}
+Content-Type: application/json
+
+{
+  "accept": false
+}
+
+### ======================================
+### 9. 응답 예시 및 가이드
+### ======================================
+
+### 성공 응답 예시:
+# {
+#   "success": true,
+#   "sentCount": 3,
+#   "totalCount": 3,
+#   "failed": [],
+#   "message": "모든 메시지가 성공적으로 전송되었습니다"
+# }
+
+### 부분 성공 응답 예시:
+# {
+#   "success": true,
+#   "sentCount": 2,
+#   "totalCount": 3,
+#   "failed": [
+#     {
+#       "userId": 4,
+#       "reason": "전송 조건 불충족 (동의 없음, 친구 아님, 카카오 정보 없음 등)"
+#     }
+#   ],
+#   "message": "2/3 메시지가 전송되었습니다"
+# }
+
+### 동의 필요 오류 응답 예시:
+# HTTP/1.1 409 Conflict
+# {
+#   "success": false,
+#   "error": "CONSENT_REQUIRED",
+#   "message": "발송자가 카카오 기능 사용에 동의하지 않았습니다",
+#   "guide": "카카오 로그인 후 알림 전송 권한을 허용해주세요"
+# }
+
+### 잘못된 파라미터 오류 응답 예시:
+# HTTP/1.1 400 Bad Request
+# {
+#   "success": false,
+#   "error": "INVALID_PARAMETER",
+#   "message": "존재하지 않는 약속입니다: 99999"
+# }
+
+### 인증 오류 응답 예시:
+# HTTP/1.1 401 Unauthorized
+# {
+#   "success": false,
+#   "message": "로그인이 필요합니다."
+# }
+
+### 사용 가능 여부 응답 예시:
+# {
+#   "available": true,
+#   "hasConsent": true,
+#   "hasKakaoInfo": true,
+#   "message": "카카오톡 알림 전송이 가능합니다"
+# }

@@ -56,7 +56,7 @@ public class Meeting {
     @Column(name = "location_coordinates", columnDefinition = "TEXT")
     private String locationCoordinates; // JSON 형태로 위도,경도
 
-    @OneToMany(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<MeetingParticipant> participants = new ArrayList<>();
 
     @OneToMany(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true)

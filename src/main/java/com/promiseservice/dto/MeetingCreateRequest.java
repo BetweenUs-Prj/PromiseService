@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 약속 생성 요청을 위한 DTO
@@ -48,6 +49,26 @@ public class MeetingCreateRequest {
     // 초대할 친구 ID 목록 (방장은 자동으로 추가되므로 여기에 포함하지 않음)
     // 이유: 요청을 보내는 사용자가 자동으로 방장이 되고, 추가로 초대할 사용자들만 명시
     private List<Long> participantUserIds;
+
+    // 클라이언트 요청과의 호환성을 위한 participants 필드 (participantUserIds와 동일)
+    private List<Long> participants;
+
+    // 알림 발송 여부
+    // 이유: 약속 생성 시 카카오톡 알림 발송을 선택적으로 할 수 있도록 하기 위해
+    private Boolean sendNotification = true;
+
+    /**
+     * 참가자 ID 목록을 가져오는 메서드
+     * 이유: participants 또는 participantUserIds 중 어느 것이든 사용할 수 있도록 하기 위해
+     * 
+     * @return 참가자 ID 목록
+     */
+    public List<Long> getParticipantUserIds() {
+        if (participantUserIds != null && !participantUserIds.isEmpty()) {
+            return participantUserIds;
+        }
+        return participants != null ? participants : new ArrayList<>();
+    }
 
     /**
      * 최대 참여자 수 검증

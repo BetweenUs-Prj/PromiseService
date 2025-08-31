@@ -12,10 +12,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import com.promiseservice.event.MeetingCreatedEvent;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * Meeting 비즈니스 로직을 처리하는 서비스
@@ -32,6 +35,7 @@ public class MeetingService {
     private final MeetingHistoryRepository historyRepository;
     private final UserService userService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 약속방 생성
@@ -79,6 +83,8 @@ public class MeetingService {
 
         // 초대할 친구들을 참여자로 추가
         if (request.getParticipantUserIds() != null && !request.getParticipantUserIds().isEmpty()) {
+            List<MeetingParticipant> participants = new ArrayList<>();
+            
             for (Long userId : request.getParticipantUserIds()) {
                 // 방장이 아닌 경우에만 초대
                 if (!userId.equals(hostId)) {
@@ -92,8 +98,20 @@ public class MeetingService {
                     participant.setUserId(userId);
                     participant.setMeeting(savedMeeting);
                     participant.setResponse(MeetingParticipant.ResponseStatus.INVITED);
-                    participantRepository.save(participant);
+                    participants.add(participant);
                 }
+            }
+            
+            // 배치로 한 번에 저장
+            if (!participants.isEmpty()) {
+                participantRepository.saveAll(participants);
+                log.info("참가자 {}명 저장 완료", participants.size());
+                
+                // Meeting 엔티티에 participants 추가
+                savedMeeting.getParticipants().addAll(participants);
+                
+                // 강제로 영속성 컨텍스트 플러시
+                participantRepository.flush();
             }
         }
 
@@ -103,10 +121,44 @@ public class MeetingService {
 
         // 약속 생성 알림 전송
         // 이유: 새로운 약속이 생성되었을 때 초대된 사용자들에게 약속 참여 요청 알림을 전송하여 참여율 향상
-        notificationService.sendMeetingCreatedNotification(savedMeeting);
+        if (request.getSendNotification() != null && request.getSendNotification()) {
+            try {
+                // 방장을 포함한 모든 참가자에게 알림 발송
+                List<Long> allParticipantIds = new ArrayList<>();
+                allParticipantIds.add(hostId); // 방장 추가
+                
+                if (request.getParticipantUserIds() != null && !request.getParticipantUserIds().isEmpty()) {
+                    // 초대된 사용자들 추가 (중복 제거)
+                    for (Long participantId : request.getParticipantUserIds()) {
+                        if   (!allParticipantIds.contains(participantId)) {
+                            allParticipantIds.add(participantId);
+                        }
+                    }
+                }
+                
+                if (!allParticipantIds.isEmpty()) {
+                    log.info("카카오톡 약속 생성 알림 발송 시작 - 수신자: {}명 (방장 포함)", allParticipantIds.size());
+                    notificationService.sendMeetingCreatedNotification(savedMeeting, allParticipantIds);
+                } else {
+                    log.info("알림 발송 대상이 없습니다");
+                }
+            } catch (Exception e) {
+                log.error("카카오톡 알림 발송 실패: {}", e.getMessage());
+                // 알림 실패는 약속 생성 실패로 처리하지 않음
+            }
+        }
 
         log.info("약속방 생성 완료 - ID: {}", savedMeeting.getId());
-        return MeetingResponse.from(savedMeeting);
+        
+        // 저장된 약속을 다시 조회하여 최신 상태로 응답 생성
+        Meeting finalMeeting = meetingRepository.findById(savedMeeting.getId())
+            .orElseThrow(() -> new RuntimeException("생성된 약속을 찾을 수 없습니다: " + savedMeeting.getId()));
+        
+        // 트랜잭션 커밋 후 알림 발송 (이벤트로 분리)
+        eventPublisher.publishEvent(new MeetingCreatedEvent(finalMeeting.getId()));
+        log.info("약속 생성 완료 이벤트 발행 - 약속 ID: {}", finalMeeting.getId());
+        
+        return MeetingResponse.from(finalMeeting);
     }
 
     /**

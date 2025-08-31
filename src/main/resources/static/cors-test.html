@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CORS 프리플라이트 테스트</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #2196F3; color: white; }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-warning { background: #ff9800; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-secondary { background: #f0f0f0; color: #333; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        
+        .result {
+            background: #f9f9f9;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { border-left-color: #4CAF50; }
+        .error { border-left-color: #f44336; }
+        
+        .curl-command {
+            background: #2d2d2d;
+            color: #f0f0f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .token-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 CORS 프리플라이트 테스트</h1>
+        <p>UserService 연동을 위한 CORS 설정과 프리플라이트 요청을 테스트합니다.</p>
+    </div>
+
+    <div class="container">
+        <h2>1. 프리플라이트 OPTIONS 테스트</h2>
+        <div class="test-section">
+            <h3>브라우저에서 프리플라이트 테스트</h3>
+            <p>브라우저가 자동으로 보내는 OPTIONS 요청을 시뮬레이션합니다.</p>
+            
+            <button onclick="testPreflight()" class="btn btn-primary">프리플라이트 테스트 실행</button>
+            <button onclick="clearResults()" class="btn btn-secondary">결과 지우기</button>
+            
+            <div id="preflightResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>curl 명령어로 프리플라이트 테스트</h3>
+            <p>터미널에서 직접 실행할 수 있는 curl 명령어:</p>
+            
+            <div class="curl-command">curl -i -X OPTIONS 'http://localhost:8080/api/appointments/1/confirm' \
+  -H 'Origin: http://localhost:8081' \
+  -H 'Access-Control-Request-Method: POST' \
+  -H 'Access-Control-Request-Headers: Authorization, Content-Type'</div>
+            
+            <p><strong>기대 응답:</strong></p>
+            <ul>
+                <li><code>HTTP/1.1 200 OK</code></li>
+                <li><code>Access-Control-Allow-Origin: http://localhost:8081</code></li>
+                <li><code>Access-Control-Allow-Methods: POST</code></li>
+                <li><code>Access-Control-Allow-Headers: Authorization, Content-Type</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>2. JWT 인증 테스트</h2>
+        <div class="test-section">
+            <h3>JWT 토큰 설정</h3>
+            <p>테스트용 JWT 토큰을 입력하거나 자동 생성하세요:</p>
+            
+            <input type="text" id="jwtToken" class="token-input" 
+                   placeholder="JWT 토큰을 입력하세요 (예: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIifQ.test)"
+                   value="">
+            
+            <button onclick="generateTestToken()" class="btn btn-secondary">테스트 토큰 생성</button>
+            <button onclick="saveTokenToStorage()" class="btn btn-primary">localStorage에 저장</button>
+            <button onclick="loadTokenFromStorage()" class="btn btn-secondary">localStorage에서 로드</button>
+        </div>
+
+        <div class="test-section">
+            <h3>API 호출 테스트 (CORS + JWT)</h3>
+            <p>실제 API 요청을 보내서 CORS와 JWT 인증이 모두 작동하는지 확인합니다.</p>
+            
+            <button onclick="testConfirmAppointment()" class="btn btn-success">약속 확정 API 테스트</button>
+            <button onclick="testGetParticipants()" class="btn btn-primary">참여자 조회 API 테스트</button>
+            <button onclick="testWithoutToken()" class="btn btn-warning">토큰 없이 API 호출</button>
+            <button onclick="testWithInvalidToken()" class="btn btn-danger">잘못된 토큰으로 API 호출</button>
+            
+            <div id="apiResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>3. 크로스 도메인 시뮬레이션</h2>
+        <div class="test-section">
+            <h3>UserService(8081)에서 PromiseService(8080) 호출 시뮬레이션</h3>
+            <p>실제 UserService에서 호출하는 것처럼 Origin 헤더를 설정해서 테스트합니다.</p>
+            
+            <button onclick="testCrossOrigin()" class="btn btn-primary">크로스 도메인 테스트</button>
+            
+            <div id="crossOriginResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // 결과 표시 함수
+        function showResult(elementId, title, data, isError = false) {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const resultClass = isError ? 'error' : 'success';
+            
+            const resultText = `[${timestamp}] ${title}\n${JSON.stringify(data, null, 2)}\n\n`;
+            
+            if (element.style.display === 'none') {
+                element.textContent = resultText;
+            } else {
+                element.textContent = resultText + element.textContent;
+            }
+            
+            element.style.display = 'block';
+            element.className = `result ${resultClass}`;
+            element.scrollTop = 0;
+        }
+
+        // 결과 지우기
+        function clearResults() {
+            ['preflightResult', 'apiResult', 'crossOriginResult'].forEach(id => {
+                const element = document.getElementById(id);
+                element.textContent = '';
+                element.style.display = 'none';
+            });
+        }
+
+        // 프리플라이트 테스트
+        async function testPreflight() {
+            try {
+                showResult('preflightResult', '프리플라이트 요청 시작...', { status: 'loading' });
+                
+                const response = await fetch('http://localhost:8080/api/appointments/1/confirm', {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': 'http://localhost:8081',
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Authorization, Content-Type'
+                    }
+                });
+
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+
+                const result = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: headers
+                };
+
+                showResult('preflightResult', '✅ 프리플라이트 성공', result);
+
+            } catch (error) {
+                showResult('preflightResult', '❌ 프리플라이트 실패', { 
+                    error: error.message,
+                    type: error.constructor.name 
+                }, true);
+            }
+        }
+
+        // 테스트 토큰 생성
+        function generateTestToken() {
+            // 간단한 JWT 형태의 테스트 토큰 생성
+            const header = btoa(JSON.stringify({alg: "HS256", typ: "JWT"}));
+            const payload = btoa(JSON.stringify({sub: "1", role: "USER", exp: Date.now() + 3600000}));
+            const signature = "test_signature_" + Math.random().toString(36).substr(2, 9);
+            
+            const testToken = `${header}.${payload}.${signature}`;
+            document.getElementById('jwtToken').value = testToken;
+            
+            showResult('apiResult', '테스트 토큰 생성됨', { 
+                token: testToken.substring(0, 50) + '...',
+                length: testToken.length 
+            });
+        }
+
+        // localStorage에 토큰 저장
+        function saveTokenToStorage() {
+            const token = document.getElementById('jwtToken').value;
+            if (token) {
+                localStorage.setItem('jwt', token);
+                showResult('apiResult', 'JWT 토큰 저장됨', { 
+                    saved: true, 
+                    length: token.length 
+                });
+            } else {
+                showResult('apiResult', '저장할 토큰이 없습니다', {}, true);
+            }
+        }
+
+        // localStorage에서 토큰 로드
+        function loadTokenFromStorage() {
+            const token = localStorage.getItem('jwt');
+            if (token) {
+                document.getElementById('jwtToken').value = token;
+                showResult('apiResult', 'JWT 토큰 로드됨', { 
+                    loaded: true, 
+                    length: token.length 
+                });
+            } else {
+                showResult('apiResult', 'localStorage에 토큰이 없습니다', {}, true);
+            }
+        }
+
+        // 약속 확정 API 테스트
+        async function testConfirmAppointment() {
+            try {
+                const token = document.getElementById('jwtToken').value || localStorage.getItem('jwt');
+                if (!token) {
+                    showResult('apiResult', '❌ JWT 토큰이 필요합니다', {}, true);
+                    return;
+                }
+
+                showResult('apiResult', 'API 호출 시작...', { endpoint: '/api/appointments/1/confirm' });
+
+                const response = await fetch('http://localhost:8080/api/appointments/1/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult('apiResult', '✅ 약속 확정 API 성공', result);
+                } else {
+                    showResult('apiResult', '❌ 약속 확정 API 실패', { 
+                        status: response.status, 
+                        result 
+                    }, true);
+                }
+
+            } catch (error) {
+                showResult('apiResult', '❌ API 호출 오류', { 
+                    error: error.message 
+                }, true);
+            }
+        }
+
+        // 참여자 조회 API 테스트
+        async function testGetParticipants() {
+            try {
+                const token = document.getElementById('jwtToken').value || localStorage.getItem('jwt');
+                if (!token) {
+                    showResult('apiResult', '❌ JWT 토큰이 필요합니다', {}, true);
+                    return;
+                }
+
+                const response = await fetch('http://localhost:8080/api/appointments/1/participants', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult('apiResult', '✅ 참여자 조회 API 성공', result);
+                } else {
+                    showResult('apiResult', '❌ 참여자 조회 API 실패', { 
+                        status: response.status, 
+                        result 
+                    }, true);
+                }
+
+            } catch (error) {
+                showResult('apiResult', '❌ API 호출 오류', { 
+                    error: error.message 
+                }, true);
+            }
+        }
+
+        // 토큰 없이 API 호출
+        async function testWithoutToken() {
+            try {
+                const response = await fetch('http://localhost:8080/api/appointments/1/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.text();
+                
+                showResult('apiResult', '🔒 토큰 없는 API 호출 결과', { 
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: result
+                }, response.status !== 401);
+
+            } catch (error) {
+                showResult('apiResult', '❌ API 호출 오류', { 
+                    error: error.message 
+                }, true);
+            }
+        }
+
+        // 잘못된 토큰으로 API 호출
+        async function testWithInvalidToken() {
+            try {
+                const response = await fetch('http://localhost:8080/api/appointments/1/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer invalid.token.here',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.text();
+                
+                showResult('apiResult', '🔒 잘못된 토큰 API 호출 결과', { 
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: result
+                }, response.status === 200); // 200이면 오류로 표시
+
+            } catch (error) {
+                showResult('apiResult', '❌ API 호출 오류', { 
+                    error: error.message 
+                }, true);
+            }
+        }
+
+        // 크로스 도메인 테스트
+        async function testCrossOrigin() {
+            try {
+                showResult('crossOriginResult', '크로스 도메인 요청 시작...', { 
+                    from: 'localhost:8080',
+                    to: 'localhost:8080',
+                    simulation: 'UserService에서 호출하는 상황 시뮬레이션'
+                });
+
+                // 실제 브라우저에서는 Origin 헤더를 직접 설정할 수 없지만,
+                // 시뮬레이션을 위해 다른 방식으로 테스트
+                const token = document.getElementById('jwtToken').value || localStorage.getItem('jwt');
+                
+                const response = await fetch('http://localhost:8080/api/appointments/1/participants', {
+                    method: 'GET',
+                    headers: token ? {
+                        'Authorization': 'Bearer ' + token
+                    } : {}
+                });
+
+                const result = response.ok ? await response.json() : await response.text();
+                
+                showResult('crossOriginResult', '✅ 크로스 도메인 시뮬레이션 완료', { 
+                    status: response.status,
+                    cors_headers: {
+                        'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+                        'access-control-allow-methods': response.headers.get('access-control-allow-methods'),
+                        'access-control-allow-headers': response.headers.get('access-control-allow-headers')
+                    },
+                    result: result
+                });
+
+            } catch (error) {
+                showResult('crossOriginResult', '❌ 크로스 도메인 테스트 실패', { 
+                    error: error.message 
+                }, true);
+            }
+        }
+
+        // 페이지 로드 시 기존 토큰 로드
+        document.addEventListener('DOMContentLoaded', function() {
+            const existingToken = localStorage.getItem('jwt');
+            if (existingToken) {
+                document.getElementById('jwtToken').value = existingToken;
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+

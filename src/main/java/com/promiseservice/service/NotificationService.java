@@ -2,11 +2,12 @@ package com.promiseservice.service;
 
 import com.promiseservice.domain.entity.Meeting;
 import com.promiseservice.domain.entity.Meeting.MeetingStatus;
+import com.promiseservice.domain.entity.MeetingParticipant;
 import com.promiseservice.domain.repository.MeetingParticipantRepository;
+import com.promiseservice.domain.repository.UserIdentityRepository;
 import com.promiseservice.dto.NotificationRequest;
 import com.promiseservice.dto.NotificationResponse;
-import com.promiseservice.dto.SmsNotificationRequest;
-import com.promiseservice.dto.SmsNotificationResponse;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,23 +16,29 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
  * 약속 관련 알림을 처리하는 서비스
  * 이유: 약속 상태 변경 시 사용자들에게 적절한 알림을 전송하여 약속 정보를 실시간으로 공유하고 
- * 사용자 참여도를 높이기 위해. 푸시 알림과 SMS 알림을 통합하여 중요한 알림을 놓치지 않도록 함
+ * 사용자 참여도를 높이기 위해. 푸시 알림 등을 통해 중요한 알림을 놓치지 않도록 함
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
+    @Value("${notifications.kakao.direct.enabled:false}")
+    private boolean kakaoDirect;
+
     private final MeetingParticipantRepository participantRepository;
+    private final UserIdentityRepository userIdentityRepository;
     private final RestTemplate restTemplate;
-    private final SmsService smsService;
+
 
     // 알림 서비스 기본 URL
     // 이유: 외부 알림 서비스와의 통신을 위한 엔드포인트 설정
@@ -43,10 +50,7 @@ public class NotificationService {
     @Value("${notificationservice.api.send:/api/notifications/send}")
     private String notificationSendApiPath;
 
-    // SMS 알림 사용 여부
-    // 이유: 중요한 알림에 대해 SMS 전송 여부를 설정하여 알림 놓침 방지
-    @Value("${notification.sms.enabled:true}")
-    private boolean smsNotificationEnabled;
+
 
     /**
      * 약속 상태 변경에 따른 알림을 전송하는 메서드
@@ -82,11 +86,7 @@ public class NotificationService {
             // 이유: 실제 알림 서비스를 통해 사용자들에게 푸시 알림을 전송하기 위해
             NotificationResponse response = sendNotification(notificationRequest);
 
-            // SMS 알림 전송 (중요한 상태 변경에 대해)
-            // 이유: 약속 확정, 취소 등 중요한 상태 변경 시 SMS로도 알림을 보내어 사용자가 놓치지 않도록 함
-            if (smsNotificationEnabled && isImportantStatusChange(newStatus)) {
-                sendSmsForStatusChange(recipientUserIds, meeting, previousStatus, newStatus, reason);
-            }
+
 
             log.info("약속 상태 변경 알림 전송 완료 - 약속 ID: {}, 성공: {}, 실패: {}", 
                     meeting.getId(), response.getSuccessCount(), response.getFailureCount());
@@ -97,47 +97,7 @@ public class NotificationService {
         }
     }
 
-    /**
-     * 약속 생성 알림을 전송하는 메서드
-     * 이유: 새로운 약속이 생성되었을 때 초대된 사용자들에게 약속 참여 요청 알림을 전송하여 
-     * 약속 참여율을 높이기 위해
-     * 
-     * @param meeting 생성된 약속 정보
-     */
-    public void sendMeetingCreatedNotification(Meeting meeting) {
-        log.info("약속 생성 알림 전송 시작 - 약속 ID: {}", meeting.getId());
 
-        try {
-            // 초대된 사용자 목록 조회 (방장 제외)
-            // 이유: 방장이 아닌 초대된 사용자들에게만 약속 참여 요청 알림을 전송하기 위해
-            List<Long> recipientUserIds = getInvitedUserIds(meeting);
-
-            if (recipientUserIds.isEmpty()) {
-                log.info("알림을 받을 초대된 사용자가 없음 - 약속 ID: {}", meeting.getId());
-                return;
-            }
-
-            // 알림 내용 생성
-            String title = "새로운 약속 초대";
-            String content = String.format("'%s' 약속에 초대되었습니다. %s에 %s에서 만나요!", 
-                meeting.getTitle(), 
-                meeting.getMeetingTime().format(java.time.format.DateTimeFormatter.ofPattern("MM월 dd일 HH:mm")),
-                meeting.getLocationName());
-
-            // 알림 요청 객체 생성
-            NotificationRequest notificationRequest = createNotificationRequest(
-                recipientUserIds, title, content, "MEETING_INVITATION", meeting.getId());
-
-            // 알림 전송
-            NotificationResponse response = sendNotification(notificationRequest);
-
-            log.info("약속 생성 알림 전송 완료 - 약속 ID: {}, 성공: {}, 실패: {}", 
-                    meeting.getId(), response.getSuccessCount(), response.getFailureCount());
-
-        } catch (Exception e) {
-            log.error("약속 생성 알림 전송 실패 - 약속 ID: {}, 에러: {}", meeting.getId(), e.getMessage());
-        }
-    }
 
     /**
      * 약속 취소 알림을 전송하는 메서드
@@ -167,12 +127,7 @@ public class NotificationService {
             // 푸시 알림 전송
             NotificationResponse response = sendNotification(notificationRequest);
 
-            // 긴급 SMS 알림 전송 (약속 취소는 긴급 알림으로 처리)
-            // 이유: 약속 취소는 중요한 정보이므로 SMS로도 즉시 알림을 보내어 참여자들이 놓치지 않도록 함
-            if (smsNotificationEnabled) {
-                String smsMessage = createSmsContentForCancellation(meeting, reason);
-                smsService.sendUrgentSms(recipientUserIds, smsMessage, meeting.getId());
-            }
+
 
             log.info("약속 취소 알림 전송 완료 - 약속 ID: {}, 성공: {}, 실패: {}", 
                     meeting.getId(), response.getSuccessCount(), response.getFailureCount());
@@ -337,161 +292,233 @@ public class NotificationService {
     }
 
     /**
-     * 중요한 상태 변경인지 확인하는 메서드
-     * 이유: SMS는 비용이 발생하므로 중요한 상태 변경에만 전송하여 효율적인 알림 운영
+     * 약속 생성 알림 전송 (기존 호환성)
+     * 이유: 기존 코드와의 호환성을 위해 유지
      * 
-     * @param status 새로운 약속 상태
-     * @return 중요한 상태 변경 여부
+     * @param meeting 생성된 약속 정보
      */
-    private boolean isImportantStatusChange(MeetingStatus status) {
-        // 확정, 완료, 취소는 중요한 상태 변경으로 분류
-        return status == MeetingStatus.CONFIRMED || 
-               status == MeetingStatus.COMPLETED || 
-               status == MeetingStatus.CANCELLED;
-    }
+    public void sendMeetingCreatedNotification(Meeting meeting, List<Long> recipientUserIds) {
+        log.info("약속 생성 알림 전송 시작 - 약속 ID: {}", meeting.getId());
 
-    /**
-     * 상태 변경에 대한 SMS를 전송하는 메서드
-     * 이유: 중요한 약속 상태 변경을 SMS로 알려 사용자가 놓치지 않도록 함
-     * 
-     * @param recipientUserIds 수신자 사용자 ID 목록
-     * @param meeting 약속 정보
-     * @param previousStatus 이전 상태
-     * @param newStatus 새로운 상태
-     * @param reason 변경 사유
-     */
-    private void sendSmsForStatusChange(List<Long> recipientUserIds, Meeting meeting, 
-                                      MeetingStatus previousStatus, MeetingStatus newStatus, String reason) {
         try {
-            String smsMessage = createSmsContentForStatusChange(meeting, previousStatus, newStatus, reason);
-            String smsType = newStatus == MeetingStatus.CANCELLED ? "URGENT" : "NORMAL";
-            
-            SmsNotificationRequest smsRequest = new SmsNotificationRequest();
-            smsRequest.setRecipientUserIds(recipientUserIds);
-            smsRequest.setMessage(smsMessage);
-            smsRequest.setSmsType(smsType);
-            smsRequest.setMeetingId(meeting.getId());
-            smsRequest.setSenderName("약속알림");
+            if (recipientUserIds.isEmpty()) {
+                log.info("알림을 받을 초대된 사용자가 없음 - 약속 ID: {}", meeting.getId());
+                return;
+            }
 
-            SmsNotificationResponse smsResponse = smsService.sendSmsToUsers(smsRequest);
-            
-            log.info("상태 변경 SMS 전송 완료 - 약속 ID: {}, SMS 성공: {}건, 실패: {}건", 
-                    meeting.getId(), smsResponse.getSuccessCount(), smsResponse.getFailureCount());
-                    
+            // 알림 내용 생성
+            String title = "새로운 약속 초대";
+            String content = String.format("'%s' 약속에 초대되었습니다. %s에 %s에서 만나요!", 
+                meeting.getTitle(), 
+                meeting.getMeetingTime().format(java.time.format.DateTimeFormatter.ofPattern("MM월 dd일 HH:mm")),
+                meeting.getLocationName());
+
+            // 알림 요청 객체 생성
+            NotificationRequest notificationRequest = createNotificationRequest(
+                recipientUserIds, title, content, "MEETING_INVITATION", meeting.getId());
+
+            // 알림 전송
+            NotificationResponse response = sendNotification(notificationRequest);
+
+            log.info("약속 생성 알림 전송 완료 - 약속 ID: {}, 성공: {}, 실패: {}", 
+                    meeting.getId(), response.getSuccessCount(), response.getFailureCount());
+
         } catch (Exception e) {
-            log.error("상태 변경 SMS 전송 실패 - 약속 ID: {}, 에러: {}", meeting.getId(), e.getMessage());
+            log.error("약속 생성 알림 전송 실패 - 약속 ID: {}, 에러: {}", meeting.getId(), e.getMessage());
         }
     }
 
     /**
-     * 상태 변경을 위한 SMS 내용을 생성하는 메서드
-     * 이유: SMS는 글자 수 제한이 있으므로 간결하면서도 핵심 정보를 포함한 메시지 생성
+     * 사용자 ID로 kakaoId를 조회하는 메서드
+     * 이유: 내부 사용자 ID를 kakaoId로 변환하여 카카오톡 발송에 사용하기 위해
      * 
-     * @param meeting 약속 정보
-     * @param previousStatus 이전 상태
-     * @param newStatus 새로운 상태
-     * @param reason 변경 사유
-     * @return SMS 메시지 내용
+     * @param userId 내부 사용자 ID
+     * @return kakaoId (Optional)
      */
-    private String createSmsContentForStatusChange(Meeting meeting, MeetingStatus previousStatus, 
-                                                 MeetingStatus newStatus, String reason) {
-        StringBuilder content = new StringBuilder();
-        
-        // SMS는 90자 제한이므로 간결하게 작성
-        content.append("[약속알림] ");
-        content.append(meeting.getTitle());
-        
-        switch (newStatus) {
-            case CONFIRMED:
-                content.append(" 약속이 확정되었습니다! ");
-                break;
-            case COMPLETED:
-                content.append(" 약속이 완료되었습니다. ");
-                break;
-            case CANCELLED:
-                content.append(" 약속이 취소되었습니다. ");
-                break;
-            default:
-                content.append(" 상태가 변경되었습니다. ");
+    private Optional<String> findKakaoIdByUserId(Long userId) {
+        try {
+            return userIdentityRepository.findByUserId(userId)
+                .stream()
+                .filter(identity -> "KAKAO".equals(identity.getProvider().name()))
+                .map(identity -> identity.getProviderUserId())
+                .findFirst();
+        } catch (Exception e) {
+            log.error("사용자 ID로 kakaoId 조회 실패 - userId: {}, error: {}", userId, e.getMessage());
+            return Optional.empty();
         }
-        
-        // 약속 시간 추가
-        content.append(meeting.getMeetingTime()
-               .format(java.time.format.DateTimeFormatter.ofPattern("MM/dd HH:mm")));
-        
-        // 사유가 있고 글자 수에 여유가 있으면 추가
-        if (reason != null && !reason.trim().isEmpty() && content.length() < 70) {
-            content.append(" (").append(reason).append(")");
-        }
-        
-        return content.toString();
     }
 
     /**
-     * 약속 취소를 위한 SMS 내용을 생성하는 메서드
-     * 이유: 약속 취소는 긴급한 정보이므로 명확하고 간결한 SMS 메시지 생성
+     * kakaoId로 직접 카카오톡 메시지 전송
+     * 이유: kakaoId를 직접 사용하여 카카오톡 발송을 단순화하고 정확성 향상
      * 
-     * @param meeting 취소된 약속 정보
-     * @param reason 취소 사유
-     * @return SMS 메시지 내용
+     * @param kakaoId 카카오 사용자 ID
+     * @param messageText 전송할 메시지 내용
+     * @param meetingId 약속 ID
      */
-    private String createSmsContentForCancellation(Meeting meeting, String reason) {
-        StringBuilder content = new StringBuilder();
-        
-        content.append("[긴급알림] ");
-        content.append(meeting.getTitle());
-        content.append(" 약속이 취소되었습니다. ");
-        content.append(meeting.getMeetingTime()
-               .format(java.time.format.DateTimeFormatter.ofPattern("MM/dd HH:mm")));
-        
-        if (reason != null && !reason.trim().isEmpty() && content.length() < 70) {
-            content.append(" 사유: ").append(reason);
-        }
-        
-        return content.toString();
-    }
-
-    /**
-     * SMS 전용 알림을 전송하는 메서드
-     * 이유: 푸시 알림과 별도로 SMS만 전송해야 하는 경우를 위한 독립적인 SMS 전송 기능
-     * 
-     * @param recipientUserIds 수신자 사용자 ID 목록
-     * @param message SMS 메시지 내용
-     * @param meetingId 관련 약속 ID
-     * @param isUrgent 긴급 여부
-     * @return SMS 전송 결과
-     */
-    public SmsNotificationResponse sendSmsOnlyNotification(List<Long> recipientUserIds, String message, 
-                                                          Long meetingId, boolean isUrgent) {
-        if (!smsNotificationEnabled) {
-            log.info("SMS 알림이 비활성화되어 있음");
-            return new SmsNotificationResponse(new java.util.ArrayList<>(), new java.util.ArrayList<>());
+    private void sendKakaoMessageByKakaoId(String kakaoId, String messageText, Long meetingId) {
+        // 테스트용 카카오 액세스 토큰 (환경변수에서 가져오기)
+        String accessToken = System.getenv("KAKAO_TEST_ACCESS_TOKEN");
+        if (accessToken == null || accessToken.isEmpty()) {
+            log.warn("카카오 테스트 액세스 토큰이 설정되지 않음 - kakaoId: {}", kakaoId);
+            return;
         }
 
         try {
-            SmsNotificationRequest smsRequest = new SmsNotificationRequest();
-            smsRequest.setRecipientUserIds(recipientUserIds);
-            smsRequest.setMessage(message);
-            smsRequest.setSmsType(isUrgent ? "URGENT" : "NORMAL");
-            smsRequest.setMeetingId(meetingId);
-            smsRequest.setSenderName(isUrgent ? "긴급알림" : "약속알림");
+            // 카카오톡 API 호출
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-            return smsService.sendSmsToUsers(smsRequest);
-            
+            // 메시지 템플릿 생성
+            String templateObject = String.format(
+                "{\"object_type\":\"text\",\"text\":\"%s\",\"link\":{\"web_url\":\"http://localhost:8080/meetings/%d\"}}",
+                messageText.replace("\"", "\\\""), // JSON 이스케이프
+                meetingId
+            );
+
+            // Form 데이터 생성
+            org.springframework.util.LinkedMultiValueMap<String, String> form = new org.springframework.util.LinkedMultiValueMap<>();
+            form.add("template_object", templateObject);
+
+            // 카카오톡 "나와의 채팅" API 호출
+            HttpEntity<org.springframework.util.LinkedMultiValueMap<String, String>> request = 
+                new HttpEntity<>(form, headers);
+
+            var response = restTemplate.postForEntity(
+                "https://kapi.kakao.com/v2/api/talk/memo/default/send",
+                request,
+                String.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("카카오톡 전송 성공 - kakaoId: {}, HTTP 상태: {}", kakaoId, response.getStatusCode());
+            } else {
+                log.warn("카카오톡 전송 실패 - kakaoId: {}, HTTP 상태: {}", kakaoId, response.getStatusCode());
+            }
+
         } catch (Exception e) {
-            log.error("SMS 전용 알림 전송 실패 - 에러: {}", e.getMessage());
-            return new SmsNotificationResponse(new java.util.ArrayList<>(), 
-                recipientUserIds.stream().map(String::valueOf).collect(Collectors.toList()));
+            log.error("카카오톡 전송 중 오류 발생 - kakaoId: {}, 에러: {}", kakaoId, e.getMessage());
         }
     }
 
     /**
-     * SMS 서비스 상태를 확인하는 메서드
-     * 이유: SMS 서비스의 가용성을 확인하여 알림 전송 가능 여부를 판단하기 위해
+     * 약속 생성 완료 메시지 (방장용)
+     * 이유: 방장에게 약속 생성이 완료되었음을 알리는 메시지를 생성하기 위해
      * 
-     * @return SMS 서비스 상태
+     * @param meeting 약속 정보
+     * @return 방장용 메시지 내용
      */
-    public boolean checkSmsServiceHealth() {
-        return smsService.checkSmsServiceHealth();
+    private String createMeetingCreatedMessage(Meeting meeting) {
+        return String.format(
+            "🎉 약속방 생성 완료!\n\n" +
+            "✨ 제목: %s\n" +
+            "📍 장소: %s\n" +
+            "⏰ 시간: %s\n\n" +
+            "약속방이 성공적으로 생성되었습니다! 🎯",
+            meeting.getTitle(),
+            meeting.getLocationName(),
+            meeting.getMeetingTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 HH:mm"))
+        );
     }
+
+    /**
+     * 약속 초대 메시지 (초대된 사용자용)
+     * 이유: 초대된 사용자에게 약속 참여 요청 알림을 전송하기 위해
+     * 
+     * @param meeting 약속 정보
+     * @return 초대된 사용자용 메시지 내용
+     */
+    private String createMeetingInviteMessage(Meeting meeting) {
+        return String.format(
+            "약속이 잡혔습니다!\n\n" +
+            "제목: %s\n" +
+            "장소: %s\n" +
+            "시간: %s\n\n" +
+            "참석 확인 부탁드려요!",
+            meeting.getTitle(),
+            meeting.getLocationName(),
+            meeting.getMeetingTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 HH:mm"))
+        );
+    }
+
+    /**
+     * 알림 결과 로깅
+     * 이유: 알림 전송 결과를 추적하고 모니터링하기 위해
+     * 
+     * @param meetingId 약속 ID
+     * @param recipientCount 수신자 수
+     * @param status 전송 상태
+     * @param message 결과 메시지
+     */
+    private void logNotificationResult(Long meetingId, int recipientCount, String status, String message) {
+        try {
+            // TODO: NotificationLogRepository 구현 후 실제 로깅
+            log.info("알림 결과 로깅 - 약속: {}, 수신자: {}명, 상태: {}, 메시지: {}", 
+                    meetingId, recipientCount, status, message);
+            
+        } catch (Exception e) {
+            log.error("알림 결과 로깅 실패: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * 약속 생성 알림 전송 (Meeting만 받는 오버로드)
+     * 이유: 약속 생성 시 Meeting 엔티티만으로 알림을 전송하기 위해
+     * 
+     * @param meeting 생성된 약속
+     */
+    public void sendMeetingCreatedNotification(Meeting meeting) {
+        log.info("약속 생성 알림 전송 시작 - 약속 ID: {}", meeting.getId());
+
+        try {
+            // 1) 내부 알림 서비스 호출 (원래 있던 로직)
+            List<Long> recipientUserIds = getInvitedUserIds(meeting);
+            if (recipientUserIds.isEmpty()) {
+                log.info("알림을 받을 초대된 사용자가 없음 - 약속 ID: {}", meeting.getId());
+                // 호스트에게만 개발용 확인 메시지 (스모크)
+                findKakaoIdByUserId(meeting.getHostId())
+                    .ifPresent(kid -> sendKakaoMessageByKakaoId(kid, createMeetingCreatedMessage(meeting), meeting.getId()));
+                return;
+            }
+
+            // 2) 내부 알림 서비스 호출
+            NotificationRequest req = createNotificationRequest(
+                recipientUserIds, "새로운 약속 초대", createMeetingInviteMessage(meeting),
+                "MEETING_INVITATION", meeting.getId());
+            NotificationResponse resp = sendNotification(req);
+            log.info("내부 알림 서비스 결과 - 성공:{}, 실패:{}", resp.getSuccessCount(), resp.getFailureCount());
+
+            // 3) 개발 환경: 카카오 직접 발송도 병행 (수신자 매핑)
+            if (kakaoDirect) {
+                log.info("카카오 직접 발송 모드 활성화 - 수신자 {}명", recipientUserIds.size());
+                for (Long uid : recipientUserIds) {
+                    findKakaoIdByUserId(uid).ifPresent(kid ->
+                        sendKakaoMessageByKakaoId(kid, createMeetingInviteMessage(meeting), meeting.getId())
+                    );
+                }
+            }
+            
+            // 4) 호스트에게도 약속 생성 완료 메시지
+            findKakaoIdByUserId(meeting.getHostId())
+                .ifPresent(kid -> sendKakaoMessageByKakaoId(kid, createMeetingCreatedMessage(meeting), meeting.getId()));
+                
+        } catch (Exception e) {
+            log.error("약속 생성 알림 전송 실패 - 약속 ID: {}, 에러: {}", meeting.getId(), e.getMessage());
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }

@@ -192,5 +192,20 @@ public class DataInitializer {
             participantRepository.save(participant);
         }
     }
+
+    /**
+     * 테스트용 사용자 데이터 생성
+     * 이유: 자동 카카오톡 알림 시스템 테스트를 위한 기본 사용자 데이터 제공
+     * 실제 User 엔티티가 없으므로 간단한 Mock 데이터로 생성
+     */
+    private void createTestUsers() {
+        log.info("테스트용 사용자 데이터 생성 중...");
+        
+        // TODO: 실제 User 엔티티가 구현되면 이 부분을 UserRepository를 사용하도록 수정
+        // 이유: 현재는 User 엔티티가 없어서 Mock 데이터로 처리, 추후 실제 사용자 관리 시스템 연결 필요
+        
+        log.info("테스트용 사용자 데이터 생성 완료 - 사용자 ID 1~8 사용 가능");
+        log.info("이제 /api/meetings로 약속 생성 시 자동 카카오톡 알림 테스트 가능");
+    }
 }
 

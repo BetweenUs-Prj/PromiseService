@@ -1,0 +1,7 @@
+{
+  "title": "디버깅 테스트",
+  "meetingTime": "2025-08-30T21:00:00",
+  "locationName": "온라인",
+  "participants": [1,2,3,4],
+  "sendNotification": true
+}

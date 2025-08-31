@@ -58,18 +58,23 @@ public class MeetingResponse {
         response.setCreatedAt(meeting.getCreatedAt());
         response.setUpdatedAt(meeting.getUpdatedAt());
         
-        // 현재 참여자 수 및 제한 여부 설정
-        response.setCurrentParticipantCount(meeting.getCurrentParticipantCount());
-        response.setIsMaxParticipantsReached(meeting.isMaxParticipantsReached());
-        
-        // 참여자 정보 변환
-        if (meeting.getParticipants() != null) {
+        // 참가자 정보 변환 (Meeting 엔티티의 participants 관계 사용)
+        if (meeting.getParticipants() != null && !meeting.getParticipants().isEmpty()) {
             response.setParticipants(
                 meeting.getParticipants().stream()
                     .map(ParticipantResponse::from)
                     .collect(Collectors.toList())
             );
+            response.setCurrentParticipantCount(meeting.getParticipants().size());
+        } else {
+            response.setParticipants(List.of());
+            response.setCurrentParticipantCount(0);
         }
+        
+        // 최대 인원 도달 여부 설정
+        response.setIsMaxParticipantsReached(
+            response.getCurrentParticipantCount() >= meeting.getMaxParticipants()
+        );
         
         return response;
     }
