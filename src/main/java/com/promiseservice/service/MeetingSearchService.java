@@ -1,9 +1,9 @@
 package com.promiseservice.service;
 
-import com.promiseservice.domain.entity.Meeting;
-import com.promiseservice.domain.entity.Meeting.MeetingStatus;
-import com.promiseservice.domain.repository.MeetingRepository;
-import com.promiseservice.domain.repository.MeetingParticipantRepository;
+import com.promiseservice.model.entity.Meeting;
+import com.promiseservice.model.entity.Meeting.MeetingStatus;
+import com.promiseservice.repository.MeetingRepository;
+import com.promiseservice.repository.MeetingParticipantRepository;
 import com.promiseservice.dto.MeetingSearchRequest;
 import com.promiseservice.dto.MeetingSearchResponse;
 import com.promiseservice.dto.MeetingSummaryResponse;

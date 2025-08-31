@@ -1,6 +1,6 @@
 package com.promiseservice.dto;
 
-import com.promiseservice.domain.entity.Meeting;
+import com.promiseservice.model.entity.Meeting;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

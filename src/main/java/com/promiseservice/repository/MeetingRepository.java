@@ -1,7 +1,7 @@
-package com.promiseservice.domain.repository;
+package com.promiseservice.repository;
 
-import com.promiseservice.domain.entity.Meeting;
-import com.promiseservice.domain.entity.Meeting.MeetingStatus;
+import com.promiseservice.model.entity.Meeting;
+import com.promiseservice.model.entity.Meeting.MeetingStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

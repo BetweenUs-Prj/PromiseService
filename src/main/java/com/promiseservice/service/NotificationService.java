@@ -1,10 +1,10 @@
 package com.promiseservice.service;
 
-import com.promiseservice.domain.entity.Meeting;
-import com.promiseservice.domain.entity.Meeting.MeetingStatus;
-import com.promiseservice.domain.entity.MeetingParticipant;
-import com.promiseservice.domain.repository.MeetingParticipantRepository;
-import com.promiseservice.domain.repository.UserIdentityRepository;
+import com.promiseservice.model.entity.Meeting;
+import com.promiseservice.model.entity.Meeting.MeetingStatus;
+import com.promiseservice.model.entity.MeetingParticipant;
+import com.promiseservice.repository.MeetingParticipantRepository;
+import com.promiseservice.repository.UserIdentityRepository;
 import com.promiseservice.dto.NotificationRequest;
 import com.promiseservice.dto.NotificationResponse;
 

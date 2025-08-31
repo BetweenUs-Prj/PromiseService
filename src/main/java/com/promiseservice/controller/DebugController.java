@@ -1,7 +1,7 @@
 package com.promiseservice.controller;
 
-import com.promiseservice.domain.entity.UserIdentity;
-import com.promiseservice.domain.repository.UserIdentityRepository;
+import com.promiseservice.model.entity.UserIdentity;
+import com.promiseservice.repository.UserIdentityRepository;
 import com.promiseservice.enums.Provider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

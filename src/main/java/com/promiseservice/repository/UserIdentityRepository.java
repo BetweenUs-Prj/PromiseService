@@ -1,6 +1,6 @@
-package com.promiseservice.domain.repository;
+package com.promiseservice.repository;
 
-import com.promiseservice.domain.entity.UserIdentity;
+import com.promiseservice.model.entity.UserIdentity;
 import com.promiseservice.enums.Provider;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

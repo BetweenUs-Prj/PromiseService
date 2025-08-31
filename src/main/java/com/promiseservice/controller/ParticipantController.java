@@ -3,7 +3,7 @@ package com.promiseservice.controller;
 import com.promiseservice.dto.InviteParticipantsRequest;
 import com.promiseservice.dto.InviteResponse;
 import com.promiseservice.dto.ParticipantResponse;
-import com.promiseservice.domain.entity.MeetingParticipant;
+import com.promiseservice.model.entity.MeetingParticipant;
 import com.promiseservice.service.ParticipantService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

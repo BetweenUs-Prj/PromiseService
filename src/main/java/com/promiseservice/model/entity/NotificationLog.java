@@ -1,10 +1,11 @@
-package com.promiseservice.entity;
+package com.promiseservice.model.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
@@ -17,7 +18,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@EntityListeners(AuditingEntityListener.class)
 public class NotificationLog {
 
     /**
@@ -89,19 +90,9 @@ public class NotificationLog {
      * 생성 시간
      * 이유: 알림 전송 시점을 기록하여 시간순 조회 및 성능 분석에 활용하기 위해
      */
-    @Column(name = "created_at", nullable = false)
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    /**
-     * 엔티티 저장 전 자동으로 생성 시간 설정
-     * 이유: 수동으로 시간을 설정하지 않아도 자동으로 현재 시간이 기록되도록 보장
-     */
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-    }
 
     /**
      * 성공 여부 판단 메서드

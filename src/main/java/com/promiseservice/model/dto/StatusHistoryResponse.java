@@ -1,6 +1,6 @@
 package com.promiseservice.dto;
 
-import com.promiseservice.domain.entity.MeetingHistory;
+import com.promiseservice.model.entity.MeetingHistory;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

@@ -1,12 +1,12 @@
 package com.promiseservice.service;
 
-import com.promiseservice.domain.entity.Meeting;
-import com.promiseservice.domain.entity.MeetingParticipant;
-import com.promiseservice.domain.entity.MeetingHistory;
+import com.promiseservice.model.entity.Meeting;
+import com.promiseservice.model.entity.MeetingParticipant;
+import com.promiseservice.model.entity.MeetingHistory;
 
-import com.promiseservice.domain.repository.MeetingRepository;
-import com.promiseservice.domain.repository.MeetingParticipantRepository;
-import com.promiseservice.domain.repository.MeetingHistoryRepository;
+import com.promiseservice.repository.MeetingRepository;
+import com.promiseservice.repository.MeetingParticipantRepository;
+import com.promiseservice.repository.MeetingHistoryRepository;
 import com.promiseservice.dto.InviteParticipantsRequest;
 import com.promiseservice.dto.InviteResponse;
 import lombok.RequiredArgsConstructor;

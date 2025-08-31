@@ -1,4 +1,4 @@
-package com.promiseservice.domain.entity;
+package com.promiseservice.model.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;

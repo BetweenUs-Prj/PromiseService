@@ -1,6 +1,6 @@
-package com.promiseservice.domain.repository;
+package com.promiseservice.repository;
 
-import com.promiseservice.domain.entity.UserConsent;
+import com.promiseservice.model.entity.UserConsent;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

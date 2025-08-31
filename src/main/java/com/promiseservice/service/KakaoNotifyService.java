@@ -1,8 +1,8 @@
 package com.promiseservice.service;
 
 import com.promiseservice.client.KakaoClient;
-import com.promiseservice.domain.entity.*;
-import com.promiseservice.domain.repository.*;
+import com.promiseservice.model.entity.*;
+import com.promiseservice.repository.*;
 import com.promiseservice.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

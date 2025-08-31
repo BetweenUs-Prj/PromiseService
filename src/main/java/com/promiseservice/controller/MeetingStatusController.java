@@ -3,7 +3,7 @@ package com.promiseservice.controller;
 import com.promiseservice.dto.MeetingStatusUpdateRequest;
 import com.promiseservice.dto.MeetingStatusResponse;
 import com.promiseservice.dto.StatusHistoryResponse;
-import com.promiseservice.domain.entity.Meeting;
+import com.promiseservice.model.entity.Meeting;
 import com.promiseservice.service.MeetingStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

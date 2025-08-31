@@ -1,10 +1,10 @@
 package com.promiseservice.controller;
 
-import com.promiseservice.domain.repository.UserIdentityRepository;
+import com.promiseservice.repository.UserIdentityRepository;
 import com.promiseservice.dto.MeetingCreateRequest;
 import com.promiseservice.dto.MeetingResponse;
 import com.promiseservice.service.MeetingService;
-import com.promiseservice.domain.entity.Meeting;
+import com.promiseservice.model.entity.Meeting;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
