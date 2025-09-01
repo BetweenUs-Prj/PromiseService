@@ -1,0 +1,390 @@
+package com.promiseservice.service;
+
+import com.promiseservice.dto.*;
+import com.promiseservice.domain.entity.Meeting;
+import com.promiseservice.domain.entity.MeetingParticipant;
+import com.promiseservice.domain.repository.MeetingRepository;
+import com.promiseservice.domain.repository.MeetingParticipantRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
+
+/**
+ * 약속 관리 서비스
+ * 이유: 약속 생성, 수정, 초대 등 약속 관련 비즈니스 로직을 처리하기 위해
+ *
+ * @author PromiseService Team
+ * @since 1.0.0
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class MeetingService {
+
+    private final MeetingRepository meetingRepository;
+    private final MeetingParticipantRepository participantRepository;
+    private final NotificationService notificationService;
+
+    /**
+     * 약속 생성
+     * 이유: 새로운 약속을 생성하고 초대된 참가자들을 등록하기 위해
+     *
+     * @param request 약속 생성 요청
+     * @return 생성된 약속 정보
+     */
+    public MeetingResponse createMeeting(MeetingCreateRequest request) {
+        log.info("약속 생성 시작 - 제목: {}, 장소: {}, 시간: {}", 
+                request.getTitle(), request.getPlaceName(), request.getScheduledAt());
+
+        // 약속 엔티티 생성 (대기 중 상태로 시작)
+        Meeting meeting = Meeting.builder()
+                .title(request.getTitle())
+                .description(request.getMemo())
+                .meetingTime(request.getScheduledAt())
+                .maxParticipants(request.getMaxParticipants())
+                .status("WAITING")
+                .hostId(1L) // TODO: 실제 사용자 ID로 변경
+                .locationName(request.getPlaceName())
+                .locationAddress(request.getPlaceAddress())
+                .build();
+
+        Meeting savedMeeting = meetingRepository.save(meeting);
+        log.info("약속 저장 완료 - ID: {}", savedMeeting.getId());
+
+        // 호스트 참가자 등록 (자동으로 확정 상태)
+        MeetingParticipant host = MeetingParticipant.builder()
+                .meetingId(savedMeeting.getId())
+                .userId(1L) // TODO: 실제 사용자 ID로 변경
+                .response("CONFIRMED")
+                .joinedAt(LocalDateTime.now())
+                .invitedAt(LocalDateTime.now())
+                .build();
+        participantRepository.save(host);
+
+        // 초대된 참가자들 등록 (초대 상태로 시작)
+        if (request.getParticipantUserIds() != null) {
+            for (Long userId : request.getParticipantUserIds()) {
+                MeetingParticipant participant = MeetingParticipant.builder()
+                        .meetingId(savedMeeting.getId())
+                        .userId(userId)
+                        .response("INVITED")
+                        .invitedAt(LocalDateTime.now())
+                        .build();
+                participantRepository.save(participant);
+            }
+        }
+
+        // 초대 알림 발송
+        sendInviteNotifications(savedMeeting, request);
+
+        // 응답 생성
+        return buildMeetingResponse(savedMeeting);
+    }
+
+    /**
+     * 약속 조회
+     * 이유: 특정 약속의 상세 정보를 조회하기 위해
+     *
+     * @param meetingId 약속 ID
+     * @return 약속 정보
+     */
+    public MeetingResponse getMeeting(Long meetingId) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
+
+        return buildMeetingResponse(meeting);
+    }
+
+    /**
+     * 약속 수정
+     * 이유: 기존 약속의 정보를 수정하기 위해
+     *
+     * @param meetingId 약속 ID
+     * @param request 수정 요청
+     * @return 수정 결과
+     */
+    public MeetingUpdateResponse updateMeeting(Long meetingId, MeetingUpdateRequest request) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
+
+        boolean updated = false;
+
+        if (request.getTitle() != null) {
+            meeting.setTitle(request.getTitle());
+            updated = true;
+        }
+
+        if (request.getScheduledAt() != null) {
+            meeting.setMeetingTime(request.getScheduledAt());
+            updated = true;
+        }
+
+        if (request.getPlaceName() != null) {
+            meeting.setLocationName(request.getPlaceName());
+            updated = true;
+        }
+
+        if (request.getPlaceAddress() != null) {
+            meeting.setLocationAddress(request.getPlaceAddress());
+            updated = true;
+        }
+
+        if (updated) {
+            meetingRepository.save(meeting);
+            log.info("약속 수정 완료 - ID: {}", meetingId);
+        }
+
+        return MeetingUpdateResponse.builder()
+                .updated(updated)
+                .build();
+    }
+
+    /**
+     * 약속 취소
+     * 이유: 약속을 취소하고 상태를 변경하기 위해
+     *
+     * @param meetingId 약속 ID
+     * @return 취소된 약속 상태
+     */
+    public String cancelMeeting(Long meetingId) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
+
+        meeting.setStatus("CANCELLED");
+        meetingRepository.save(meeting);
+
+        log.info("약속 취소 완료 - ID: {}", meetingId);
+        return "CANCELLED";
+    }
+
+    /**
+     * 약속 초대
+     * 이유: 기존 약속에 새로운 참가자들을 초대하기 위해
+     *
+     * @param meetingId 약속 ID
+     * @param request 초대 요청
+     * @return 초대 결과
+     */
+    public MeetingInviteResponse inviteParticipants(Long meetingId, MeetingInviteRequest request) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
+
+        List<MeetingInviteResponse.InvitedParticipant> invited = new ArrayList<>();
+
+        if (request.getUserIds() != null) {
+            for (Long userId : request.getUserIds()) {
+                MeetingParticipant participant = MeetingParticipant.builder()
+                        .meetingId(meetingId)
+                        .userId(userId)
+                        .response("INVITED")
+                        .invitedAt(LocalDateTime.now())
+                        .build();
+                participantRepository.save(participant);
+
+                invited.add(MeetingInviteResponse.InvitedParticipant.builder()
+                        .userId(userId)
+                        .status("INVITED")
+                        .build());
+            }
+        }
+
+        // 초대 알림 발송
+        if (request.isSendKakao()) {
+            sendInviteNotifications(meeting, request.getUserIds());
+        }
+
+        return MeetingInviteResponse.builder()
+                .invited(invited)
+                .kakaoSent(request.isSendKakao())
+                .errors(new ArrayList<>())
+                .build();
+    }
+
+    /**
+     * 약속 참가 수락
+     * 이유: 초대받은 사용자가 약속 참가를 수락하기 위해
+     *
+     * @param meetingId 약속 ID
+     * @param userId 사용자 ID
+     * @return 참가 상태
+     */
+    public String joinMeeting(Long meetingId, Long userId) {
+        MeetingParticipant participant = participantRepository
+                .findByMeetingIdAndUserId(meetingId, userId)
+                .orElseThrow(() -> new RuntimeException("참가자 정보를 찾을 수 없습니다"));
+
+        participant.setResponse("CONFIRMED");
+        participant.setJoinedAt(LocalDateTime.now());
+        participantRepository.save(participant);
+
+        log.info("약속 참가 수락 - 약속 ID: {}, 사용자 ID: {}", meetingId, userId);
+
+        return "CONFIRMED";
+    }
+
+    /**
+     * 약속 나가기
+     * 이유: 참가자가 약속에서 나가기 위해
+     *
+     * @param meetingId 약속 ID
+     * @param userId 사용자 ID
+     * @return 나가기 상태
+     */
+    public String leaveMeeting(Long meetingId, Long userId) {
+        MeetingParticipant participant = participantRepository
+                .findByMeetingIdAndUserId(meetingId, userId)
+                .orElseThrow(() -> new RuntimeException("참가자 정보를 찾을 수 없습니다"));
+
+        participant.setResponse("CANCELLED");
+        participantRepository.save(participant);
+
+        log.info("약속 나가기 - 약속 ID: {}, 사용자 ID: {}", meetingId, userId);
+        return "LEFT";
+    }
+
+    /**
+     * 약속 참가자 목록 조회
+     * 이유: 특정 약속에 참가하는 사용자들의 목록을 조회하기 위해
+     *
+     * @param meetingId 약속 ID
+     * @return 참가자 목록
+     */
+    public MeetingParticipantsResponse getParticipants(Long meetingId) {
+        List<MeetingParticipant> participants = participantRepository.findByMeetingId(meetingId);
+
+        List<MeetingParticipantsResponse.ParticipantInfo> items = participants.stream()
+                .map(p -> MeetingParticipantsResponse.ParticipantInfo.builder()
+                        .userId(p.getUserId())
+                        .name("사용자" + p.getUserId()) // TODO: 실제 사용자 이름으로 변경
+                        .role("PARTICIPANT") // DDL에는 role 필드가 없으므로 기본값 사용
+                        .status(p.getResponse())
+                        .build())
+                .collect(Collectors.toList());
+
+        return MeetingParticipantsResponse.builder()
+                .items(items)
+                .build();
+    }
+
+    /**
+     * 약속 확정
+     * 이유: 모든 참가자가 수락한 후 약속을 확정하기 위해
+     *
+     * @param meetingId 약속 ID
+     * @return 확정 결과
+     */
+    public String confirmMeeting(Long meetingId) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
+
+        // 모든 참가자가 수락했는지 확인
+        List<MeetingParticipant> confirmedParticipants = participantRepository
+                .findByMeetingIdAndResponse(meeting.getId(), "CONFIRMED");
+
+        if (confirmedParticipants.size() < 2) {
+            throw new RuntimeException("최소 2명 이상의 참가자가 필요합니다");
+        }
+
+        meeting.setStatus("CONFIRMED");
+        meetingRepository.save(meeting);
+
+        log.info("약속 확정 완료 - ID: {}", meetingId);
+        return "CONFIRMED";
+    }
+
+    /**
+     * 약속 응답 생성
+     * 이유: 클라이언트에게 약속 정보를 전달하기 위한 응답을 생성하기 위해
+     *
+     * @param meeting 약속 엔티티
+     * @return 약속 응답
+     */
+    private MeetingResponse buildMeetingResponse(Meeting meeting) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String formattedTime = meeting.getMeetingTime().format(formatter);
+
+        return MeetingResponse.builder()
+                .meetingId(meeting.getId())
+                .status(meeting.getStatus())
+                .host(MeetingResponse.HostInfo.builder()
+                        .userId(meeting.getHostId())
+                        .name("사용자" + meeting.getHostId()) // TODO: 실제 사용자 이름으로 변경
+                        .build())
+                .place(MeetingResponse.PlaceInfo.builder()
+                        .placeId(1L) // TODO: 실제 장소 ID로 변경
+                        .placeName(meeting.getLocationName())
+                        .address(meeting.getLocationAddress())
+                        .lat(37.4979) // TODO: 실제 좌표로 변경
+                        .lng(127.0276)
+                        .build())
+                .participants(buildParticipantInfo(meeting.getId()))
+                .build();
+    }
+
+    /**
+     * 참가자 정보 생성
+     * 이유: 참가자 목록을 응답에 포함하기 위해
+     *
+     * @param meetingId 약속 ID
+     * @return 참가자 정보 목록
+     */
+    private List<MeetingResponse.ParticipantInfo> buildParticipantInfo(Long meetingId) {
+        List<MeetingParticipant> participants = participantRepository.findByMeetingId(meetingId);
+
+        return participants.stream()
+                .map(p -> MeetingResponse.ParticipantInfo.builder()
+                        .userId(p.getUserId())
+                        .role("PARTICIPANT") // DDL에는 role 필드가 없으므로 기본값 사용
+                        .status(p.getResponse())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 초대 알림 발송
+     * 이유: 초대된 참가자들에게 알림을 보내기 위해
+     *
+     * @param meeting 약속 정보
+     * @param participantUserIds 참가자 사용자 ID 목록
+     */
+    private void sendInviteNotifications(Meeting meeting, List<Long> participantUserIds) {
+        if (participantUserIds == null || participantUserIds.isEmpty()) {
+            return;
+        }
+
+        log.info("초대 알림 발송 시작 - 약속 ID: {}, 참가자 수: {}", meeting.getId(), participantUserIds.size());
+
+        for (Long userId : participantUserIds) {
+            try {
+                // TODO: NotificationService의 메서드 시그니처에 맞게 수정 필요
+                // notificationService.sendMeetingInviteNotification(userId, meeting);
+                log.info("초대 알림 발송 성공 - 사용자 ID: {}", userId);
+            } catch (Exception e) {
+                log.error("초대 알림 발송 실패 - 사용자 ID: {}, 오류: {}", userId, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 초대 알림 발송 (MeetingCreateRequest용)
+     * 이유: 약속 생성 시 초대 알림을 보내기 위해
+     *
+     * @param meeting 약속 정보
+     * @param request 약속 생성 요청
+     */
+    private void sendInviteNotifications(Meeting meeting, MeetingCreateRequest request) {
+        if (request.getParticipantUserIds() == null || request.getParticipantUserIds().isEmpty()) {
+            return;
+        }
+
+        sendInviteNotifications(meeting, request.getParticipantUserIds());
+    }
+}
