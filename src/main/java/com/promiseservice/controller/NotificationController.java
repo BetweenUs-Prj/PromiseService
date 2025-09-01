@@ -1,6 +1,6 @@
 package com.promiseservice.controller;
 
-import com.promiseservice.dto.KakaoNotificationRequest;
+import com.promiseservice.model.dto.KakaoNotificationRequest;
 import com.promiseservice.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

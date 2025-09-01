@@ -1,10 +1,10 @@
 package com.promiseservice.service;
 
-import com.promiseservice.dto.*;
-import com.promiseservice.domain.entity.Meeting;
-import com.promiseservice.domain.entity.MeetingParticipant;
-import com.promiseservice.domain.repository.MeetingRepository;
-import com.promiseservice.domain.repository.MeetingParticipantRepository;
+import com.promiseservice.model.dto.*;
+import com.promiseservice.model.entity.Meeting;
+import com.promiseservice.model.entity.MeetingParticipant;
+import com.promiseservice.repository.MeetingRepository;
+import com.promiseservice.repository.MeetingParticipantRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

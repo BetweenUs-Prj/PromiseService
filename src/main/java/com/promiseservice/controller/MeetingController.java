@@ -1,6 +1,6 @@
 package com.promiseservice.controller;
 
-import com.promiseservice.dto.*;
+import com.promiseservice.model.dto.*;
 import com.promiseservice.service.MeetingService;
 import com.promiseservice.validator.MeetingValidator;
 import lombok.RequiredArgsConstructor;

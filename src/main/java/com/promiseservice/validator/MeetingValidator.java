@@ -1,8 +1,8 @@
 package com.promiseservice.validator;
 
-import com.promiseservice.dto.MeetingCreateRequest;
-import com.promiseservice.dto.MeetingUpdateRequest;
-import com.promiseservice.dto.MeetingInviteRequest;
+import com.promiseservice.model.dto.MeetingCreateRequest;
+import com.promiseservice.model.dto.MeetingUpdateRequest;
+import com.promiseservice.model.dto.MeetingInviteRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
