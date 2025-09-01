@@ -82,5 +82,5 @@ public class MeetingParticipant {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    private UserProfile user;
+    private User user;
 }

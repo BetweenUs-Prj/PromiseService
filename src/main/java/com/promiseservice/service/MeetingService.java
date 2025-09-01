@@ -3,8 +3,12 @@ package com.promiseservice.service;
 import com.promiseservice.model.dto.*;
 import com.promiseservice.model.entity.Meeting;
 import com.promiseservice.model.entity.MeetingParticipant;
+import com.promiseservice.model.entity.Place;
+import com.promiseservice.model.entity.Friendship;
 import com.promiseservice.repository.MeetingRepository;
 import com.promiseservice.repository.MeetingParticipantRepository;
+import com.promiseservice.repository.PlaceRepository;
+import com.promiseservice.repository.FriendshipRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +35,8 @@ public class MeetingService {
 
     private final MeetingRepository meetingRepository;
     private final MeetingParticipantRepository participantRepository;
+    private final PlaceRepository placeRepository;
+    private final FriendshipRepository friendshipRepository;
     private final NotificationService notificationService;
 
     /**
@@ -52,6 +58,7 @@ public class MeetingService {
                 .maxParticipants(request.getMaxParticipants())
                 .status("WAITING")
                 .hostId(1L) // TODO: 실제 사용자 ID로 변경
+                .placeId(request.getPlaceId())
                 .locationName(request.getPlaceName())
                 .locationAddress(request.getPlaceAddress())
                 .build();
@@ -173,14 +180,32 @@ public class MeetingService {
      * @param request 초대 요청
      * @return 초대 결과
      */
-    public MeetingInviteResponse inviteParticipants(Long meetingId, MeetingInviteRequest request) {
+    public MeetingInviteResponse inviteParticipants(Long meetingId, MeetingInviteRequest request, Long hostUserId) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
 
         List<MeetingInviteResponse.InvitedParticipant> invited = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
 
+        // 사용자 ID 목록으로 초대 (친구 관계 확인)
         if (request.getUserIds() != null) {
             for (Long userId : request.getUserIds()) {
+                // 친구 관계 확인
+                boolean isFriend = friendshipRepository.areFriends(hostUserId, userId);
+                if (!isFriend) {
+                    errors.add("사용자 " + userId + "는 친구가 아닙니다");
+                    continue;
+                }
+
+                // 이미 참여중인지 확인
+                boolean alreadyParticipant = participantRepository
+                        .findByMeetingIdAndUserId(meetingId, userId)
+                        .isPresent();
+                if (alreadyParticipant) {
+                    errors.add("사용자 " + userId + "는 이미 참여 중입니다");
+                    continue;
+                }
+
                 MeetingParticipant participant = MeetingParticipant.builder()
                         .meetingId(meetingId)
                         .userId(userId)
@@ -196,15 +221,23 @@ public class MeetingService {
             }
         }
 
+        // 카카오 ID 목록으로 초대 (친구 관계는 카카오에서 확인되었다고 가정)
+        if (request.getKakaoIds() != null) {
+            for (String kakaoId : request.getKakaoIds()) {
+                // 카카오 ID를 통한 초대 로직 (실제 구현 시 카카오 친구 매핑 테이블 참조)
+                log.info("카카오 ID {} 초대 처리", kakaoId);
+            }
+        }
+
         // 초대 알림 발송
-        if (request.isSendKakao()) {
+        if (request.isSendKakao() && !invited.isEmpty()) {
             sendInviteNotifications(meeting, request.getUserIds());
         }
 
         return MeetingInviteResponse.builder()
                 .invited(invited)
                 .kakaoSent(request.isSendKakao())
-                .errors(new ArrayList<>())
+                .errors(errors)
                 .build();
     }
 
@@ -259,14 +292,21 @@ public class MeetingService {
      */
     public MeetingParticipantsResponse getParticipants(Long meetingId) {
         List<MeetingParticipant> participants = participantRepository.findByMeetingId(meetingId);
+        Meeting meeting = meetingRepository.findById(meetingId).orElse(null);
 
         List<MeetingParticipantsResponse.ParticipantInfo> items = participants.stream()
-                .map(p -> MeetingParticipantsResponse.ParticipantInfo.builder()
-                        .userId(p.getUserId())
-                        .name("사용자" + p.getUserId()) // TODO: 실제 사용자 이름으로 변경
-                        .role("PARTICIPANT") // DDL에는 role 필드가 없으므로 기본값 사용
-                        .status(p.getResponse())
-                        .build())
+                .map(p -> {
+                    String role = "MEMBER";
+                    if (meeting != null && meeting.getHostId().equals(p.getUserId())) {
+                        role = "HOST";
+                    }
+                    return MeetingParticipantsResponse.ParticipantInfo.builder()
+                            .userId(p.getUserId())
+                            .name("사용자" + p.getUserId()) // TODO: 실제 사용자 이름으로 변경
+                            .role(role)
+                            .status(mapResponseStatus(p.getResponse()))
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         return MeetingParticipantsResponse.builder()
@@ -313,18 +353,13 @@ public class MeetingService {
 
         return MeetingResponse.builder()
                 .meetingId(meeting.getId())
+                .title(meeting.getTitle())
                 .status(meeting.getStatus())
                 .host(MeetingResponse.HostInfo.builder()
                         .userId(meeting.getHostId())
                         .name("사용자" + meeting.getHostId()) // TODO: 실제 사용자 이름으로 변경
                         .build())
-                .place(MeetingResponse.PlaceInfo.builder()
-                        .placeId(1L) // TODO: 실제 장소 ID로 변경
-                        .placeName(meeting.getLocationName())
-                        .address(meeting.getLocationAddress())
-                        .lat(37.4979) // TODO: 실제 좌표로 변경
-                        .lng(127.0276)
-                        .build())
+                .place(buildPlaceInfo(meeting))
                 .participants(buildParticipantInfo(meeting.getId()))
                 .build();
     }
@@ -338,14 +373,36 @@ public class MeetingService {
      */
     private List<MeetingResponse.ParticipantInfo> buildParticipantInfo(Long meetingId) {
         List<MeetingParticipant> participants = participantRepository.findByMeetingId(meetingId);
-
+        Meeting meeting = meetingRepository.findById(meetingId).orElse(null);
+        
         return participants.stream()
-                .map(p -> MeetingResponse.ParticipantInfo.builder()
-                        .userId(p.getUserId())
-                        .role("PARTICIPANT") // DDL에는 role 필드가 없으므로 기본값 사용
-                        .status(p.getResponse())
-                        .build())
+                .map(p -> {
+                    String role = "MEMBER";
+                    if (meeting != null && meeting.getHostId().equals(p.getUserId())) {
+                        role = "HOST";
+                    }
+                    return MeetingResponse.ParticipantInfo.builder()
+                            .userId(p.getUserId())
+                            .role(role)
+                            .status(mapResponseStatus(p.getResponse()))
+                            .build();
+                })
                 .collect(Collectors.toList());
+    }
+    
+    /**
+     * 응답 상태 매핑
+     * 이유: 데이터베이스의 응답 상태를 API 스펙에 맞는 상태로 변환하기 위해
+     */
+    private String mapResponseStatus(String dbStatus) {
+        if ("CONFIRMED".equals(dbStatus)) {
+            return "JOINED";
+        } else if ("INVITED".equals(dbStatus)) {
+            return "INVITED";
+        } else if ("CANCELLED".equals(dbStatus)) {
+            return "LEFT";
+        }
+        return dbStatus;
     }
 
     /**
@@ -386,5 +443,36 @@ public class MeetingService {
         }
 
         sendInviteNotifications(meeting, request.getParticipantUserIds());
+    }
+
+    /**
+     * 장소 정보 빌드
+     * 이유: Place 엔티티와 Meeting의 location 정보를 조합하여 PlaceInfo를 구성하기 위해
+     */
+    private MeetingResponse.PlaceInfo buildPlaceInfo(Meeting meeting) {
+        MeetingResponse.PlaceInfo.PlaceInfoBuilder builder = MeetingResponse.PlaceInfo.builder();
+        
+        // Place 엔티티가 있는 경우 우선 사용
+        if (meeting.getPlaceId() != null) {
+            placeRepository.findByIdAndActive(meeting.getPlaceId())
+                    .ifPresent(place -> {
+                        builder.placeId(place.getId())
+                               .placeName(place.getName())
+                               .address(place.getAddress());
+                        if (place.getLatitude() != null && place.getLongitude() != null) {
+                            builder.lat(place.getLatitude().doubleValue())
+                                   .lng(place.getLongitude().doubleValue());
+                        }
+                    });
+        } else {
+            // Place 엔티티가 없으면 Meeting의 location 정보 사용
+            builder.placeId(null)
+                   .placeName(meeting.getLocationName())
+                   .address(meeting.getLocationAddress())
+                   .lat(37.4979) // TODO: 실제 좌표로 변경
+                   .lng(127.0276);
+        }
+        
+        return builder.build();
     }
 }

@@ -12,7 +12,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 /**
- * 사용자 프로필 엔티티
+ * 사용자 엔티티
  * 이유: 사용자의 기본 정보와 프로필을 관리하기 위해
  *
  * @author PromiseService Team
@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-public class UserProfile {
+public class User {
 
     /**
      * PK

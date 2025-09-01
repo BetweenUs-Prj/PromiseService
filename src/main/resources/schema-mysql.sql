@@ -11,21 +11,24 @@ CREATE DATABASE IF NOT EXISTS `beetween_us_db`
 USE `beetween_us_db`;
 
 -- ================================
--- 1. 친구 요청 테이블
+-- 1. 장소 테이블
 -- ================================
-CREATE TABLE friend_requests (
-                                 id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'PK',
-                                 from_user_id BIGINT NOT NULL COMMENT '친구 요청을 보낸 사용자 ID',
-                                 to_user_id BIGINT NOT NULL COMMENT '친구 요청을 받은 사용자 ID',
-                                 status VARCHAR(50) NOT NULL COMMENT '친구 요청 상태 (PENDING, ACCEPTED, REJECTED, CANCELLED)',
-                                 message VARCHAR(500) NULL COMMENT '요청 메시지',
-                                 created_at DATETIME NOT NULL COMMENT '요청 생성 시간',
-                                 processed_at DATETIME NULL COMMENT '요청 처리 시간',
-                                 version BIGINT NOT NULL DEFAULT 0 COMMENT '낙관적 락 버전'
+CREATE TABLE places (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'PK',
+                        name VARCHAR(255) NOT NULL COMMENT '장소 이름',
+                        address VARCHAR(500) NULL COMMENT '장소 주소',
+                        latitude DECIMAL(10, 8) NULL COMMENT '위도',
+                        longitude DECIMAL(11, 8) NULL COMMENT '경도',
+                        category VARCHAR(50) NULL COMMENT '장소 카테고리',
+                        is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '활성화 여부',
+                        created_at DATETIME NOT NULL COMMENT '생성 시간',
+                        updated_at DATETIME NULL COMMENT '수정 시간'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX idx_friend_requests_from_user ON friend_requests(from_user_id);
-CREATE INDEX idx_friend_requests_to_user ON friend_requests(to_user_id);
+CREATE INDEX idx_places_name ON places(name);
+CREATE INDEX idx_places_category ON places(category);
+CREATE INDEX idx_places_is_active ON places(is_active);
+
 
 -- ================================
 -- 2. 친구 관계 테이블
@@ -78,13 +81,16 @@ CREATE TABLE meeting (
                          location_name VARCHAR(500) NULL COMMENT '약속 장소명',
                          location_address VARCHAR(500) NULL COMMENT '약속 장소 상세 주소',
                          location_coordinates TEXT NULL COMMENT '좌표 JSON',
+                         place_id BIGINT NULL COMMENT '장소 ID',
                          created_at DATETIME NOT NULL COMMENT '약속 생성 시각',
-                         updated_at DATETIME NULL COMMENT '약속 수정 시각'
+                         updated_at DATETIME NULL COMMENT '약속 수정 시각',
+                         CONSTRAINT fk_meeting_place FOREIGN KEY (place_id) REFERENCES places(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX idx_meeting_time ON meeting(meeting_time);
 CREATE INDEX idx_status ON meeting(status);
 CREATE INDEX idx_host_id ON meeting(host_id);
+CREATE INDEX idx_place_id ON meeting(place_id);
 
 -- ================================
 -- 5. 약속 히스토리 테이블
@@ -140,26 +146,9 @@ CREATE INDEX idx_notification_meeting_id ON notification_log(meeting_id);
 CREATE INDEX idx_notification_user_id ON notification_log(user_id);
 CREATE INDEX idx_notification_trace_id ON notification_log(trace_id);
 
--- ================================
--- 8. 사용자 동의 테이블
--- ================================
-CREATE TABLE user_consents (
-                               id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'PK',
-                               user_id BIGINT NOT NULL UNIQUE COMMENT 'UserService의 users.id 참조',
-                               talk_message_consent BOOLEAN NOT NULL DEFAULT FALSE COMMENT '카카오톡 동의',
-                               friends_consent BOOLEAN NOT NULL DEFAULT FALSE COMMENT '친구 동의',
-                               marketing_consent BOOLEAN NOT NULL DEFAULT FALSE COMMENT '마케팅 동의',
-                               consent_details TEXT NULL COMMENT '추가 동의 JSON',
-                               created_at DATETIME NOT NULL COMMENT '생성 시각',
-                               updated_at DATETIME NULL COMMENT '수정 시각'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE UNIQUE INDEX idx_user_consents_user_id ON user_consents(user_id);
-CREATE INDEX idx_user_consents_talk_message ON user_consents(talk_message_consent);
-CREATE INDEX idx_user_consents_friends ON user_consents(friends_consent);
 
 -- ================================
--- 9. OAuth 사용자 신원 테이블
+-- 8. OAuth 사용자 신원 테이블
 -- ================================
 CREATE TABLE user_identity (
                                id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'PK',
@@ -180,7 +169,7 @@ CREATE INDEX idx_user_identity_user_id ON user_identity(user_id);
 CREATE INDEX idx_user_identity_provider ON user_identity(provider);
 
 -- ================================
--- 10. 사용자 프로필 테이블
+-- 9. 사용자 프로필 테이블
 -- ================================
 CREATE TABLE user_profiles (
                                id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'PK',

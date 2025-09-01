@@ -74,13 +74,24 @@ public class MeetingValidator {
      * 이유: 약속 생성에 필요한 기본 필드들이 올바르게 입력되었는지 확인하기 위해
      */
     private boolean isValidBasicFields(MeetingCreateRequest request) {
-        return request.getTitle() != null && !request.getTitle().trim().isEmpty() &&
-               request.getPlaceId() != null && request.getPlaceId() > 0 &&
-               request.getPlaceName() != null && !request.getPlaceName().trim().isEmpty() &&
-               request.getPlaceAddress() != null && !request.getPlaceAddress().trim().isEmpty() &&
-               request.getScheduledAt() != null && request.getScheduledAt().isAfter(LocalDateTime.now()) &&
-               request.getMaxParticipants() != null && request.getMaxParticipants() >= 2 &&
-               request.getParticipantUserIds() != null && !request.getParticipantUserIds().isEmpty();
+        // 필수 필드: title, placeId, scheduledAt
+        if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
+            return false;
+        }
+        
+        if (request.getPlaceId() == null || request.getPlaceId() <= 0) {
+            return false;
+        }
+        
+        if (request.getScheduledAt() == null || request.getScheduledAt().isBefore(LocalDateTime.now())) {
+            return false;
+        }
+        
+        // 선택적 필드: memo는 null이어도 됨
+        // maxParticipants는 기본값이 있으면 됨 (서비스에서 처리)
+        // participantUserIds는 선택적 (생성 시 초대하지 않을 수 있음)
+        
+        return true;
     }
 
     /**
@@ -88,12 +99,20 @@ public class MeetingValidator {
      * 이유: 초대할 참여자 수가 최대 참여자 수를 초과하지 않는지 확인하기 위해
      */
     private boolean isValidParticipantCount(MeetingCreateRequest request) {
-        int totalInvitees = request.getParticipantUserIds().size();
+        // maxParticipants가 설정되지 않았으면 기본값 사용 (10명 가정)
+        int maxParticipants = request.getMaxParticipants() != null ? request.getMaxParticipants() : 10;
+        
+        // 초대자 수 계산 (선택적 필드들에 대한 null 체크)
+        int totalInvitees = 0;
+        if (request.getParticipantUserIds() != null) {
+            totalInvitees += request.getParticipantUserIds().size();
+        }
         if (request.getKakaoIds() != null) {
             totalInvitees += request.getKakaoIds().size();
         }
-
-        return totalInvitees <= request.getMaxParticipants();
+        
+        // 호스트 1명 + 초대자 수 <= 최대 참여자 수
+        return (1 + totalInvitees) <= maxParticipants;
     }
 
     /**
@@ -103,7 +122,7 @@ public class MeetingValidator {
     private boolean hasUpdateFields(MeetingUpdateRequest request) {
         return request.getTitle() != null || request.getScheduledAt() != null ||
                request.getMemo() != null || request.getMaxParticipants() != null ||
-               request.getPlaceId() != null || request.getStatus() != null;
+               request.getPlaceName() != null || request.getPlaceAddress() != null;
     }
 
     /**
@@ -127,8 +146,14 @@ public class MeetingValidator {
             return false;
         }
 
-        // 장소 ID가 제공된 경우 유효한 값인지 검증
-        if (request.getPlaceId() != null && request.getPlaceId() <= 0) {
+
+        // 장소명이 제공된 경우 빈 문자열이 아닌지 검증
+        if (request.getPlaceName() != null && request.getPlaceName().trim().isEmpty()) {
+            return false;
+        }
+
+        // 장소 주소가 제공된 경우 빈 문자열이 아닌지 검증
+        if (request.getPlaceAddress() != null && request.getPlaceAddress().trim().isEmpty()) {
             return false;
         }
 

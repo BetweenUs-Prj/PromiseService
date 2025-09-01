@@ -27,6 +27,12 @@ public class MeetingResponse {
     private Long meetingId;
 
     /**
+     * 약속 제목
+     * 이유: 약속의 제목을 표시하기 위해
+     */
+    private String title;
+
+    /**
      * 약속 상태
      * 이유: 약속의 현재 상태를 표시하기 위해
      */

@@ -101,6 +101,13 @@ public class Meeting {
     private String locationCoordinates;
 
     /**
+     * 장소 ID
+     * 이유: Place 엔티티와의 연관을 위한 외래키, API의 placeId 필드 지원
+     */
+    @Column(name = "place_id")
+    private Long placeId;
+
+    /**
      * 생성 시각
      * 이유: 약속이 언제 생성되었는지 기록하기 위해
      */
@@ -123,4 +130,12 @@ public class Meeting {
     @OneToMany(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<MeetingParticipant> participants = new ArrayList<>();
+
+    /**
+     * 장소와의 관계
+     * 이유: 약속 장소의 상세 정보를 조회하기 위해
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "place_id", insertable = false, updatable = false)
+    private Place place;
 }

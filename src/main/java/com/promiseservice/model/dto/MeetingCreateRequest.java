@@ -42,7 +42,6 @@ public class MeetingCreateRequest {
      * 장소명
      * 이유: 사용자에게 표시할 장소명을 직접 제공하기 위해
      */
-    @NotBlank(message = "장소명은 필수입니다")
     @Size(max = 255, message = "장소명은 255자를 초과할 수 없습니다")
     private String placeName;
 
@@ -50,7 +49,6 @@ public class MeetingCreateRequest {
      * 장소 주소
      * 이유: 사용자에게 표시할 장소 주소를 직접 제공하기 위해
      */
-    @NotBlank(message = "장소 주소는 필수입니다")
     @Size(max = 500, message = "장소 주소는 500자를 초과할 수 없습니다")
     private String placeAddress;
 
@@ -66,7 +64,6 @@ public class MeetingCreateRequest {
      * 최대 참여 인원 수
      * 이유: 장소 수용 인원이나 모임 규모를 제한하여 원활한 진행을 보장하기 위해
      */
-    @NotNull(message = "최대 참여 인원은 필수입니다")
     @Min(value = 2, message = "최대 참여 인원은 2명 이상이어야 합니다")
     @Max(value = 100, message = "최대 참여 인원은 100명을 초과할 수 없습니다")
     private Integer maxParticipants;
@@ -89,7 +86,6 @@ public class MeetingCreateRequest {
      * 초대할 사용자 ID 목록
      * 이유: 어떤 사용자들을 약속에 초대할지 지정하기 위해
      */
-    @NotEmpty(message = "초대할 사용자는 최소 1명 이상이어야 합니다")
     @Size(max = 98, message = "초대할 사용자는 최대 98명까지 가능합니다") // 호스트 포함 최대 100명
     private List<Long> participantUserIds;
 

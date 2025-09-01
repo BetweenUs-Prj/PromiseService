@@ -35,9 +35,10 @@ public class MeetingController {
      * @return 생성된 약속 정보
      */
     @PostMapping
-    public ResponseEntity<MeetingResponse> createMeeting(@Valid @RequestBody MeetingCreateRequest request) {
-        log.info("약속 생성 요청 - 제목: {}, 장소: {}, 시간: {}",
-                request.getTitle(), request.getPlaceName(), request.getScheduledAt());
+    public ResponseEntity<MeetingResponse> createMeeting(@Valid @RequestBody MeetingCreateRequest request,
+                                                        @RequestHeader("X-User-ID") Long userId) {
+        log.info("약속 생성 요청 - 사용자: {}, 제목: {}, 장소ID: {}, 시간: {}",
+                userId, request.getTitle(), request.getPlaceId(), request.getScheduledAt());
 
         // 유효성 검증
         if (!meetingValidator.isValidCreateRequest(request)) {
@@ -46,7 +47,7 @@ public class MeetingController {
 
         try {
             MeetingResponse response = meetingService.createMeeting(request);
-            log.info("약속 생성 완료 - ID: {}, 제목: {}", response.getMeetingId(), response.getTitle());
+            log.info("약속 생성 완료 - ID: {}, 상태: {}", response.getMeetingId(), response.getStatus());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("약속 생성 실패 - 에러: {}", e.getMessage(), e);
@@ -74,77 +75,8 @@ public class MeetingController {
         }
     }
 
-    /**
-     * 약속 확정 API
-     * 이유: 모든 참가자가 응답한 후 방장이 약속을 확정할 수 있도록 하기 위해
-     *
-     * @param request 약속 확정 요청 데이터
-     * @return 확정된 약속 정보
-     */
-    @PostMapping("/confirm")
-    public ResponseEntity<MeetingResponse> confirmMeeting(@Valid @RequestBody MeetingConfirmRequest request) {
-        log.info("약속 확정 요청 - ID: {}", request.getMeetingId());
 
-        try {
-            MeetingResponse response = meetingService.confirmMeeting(request);
-            log.info("약속 확정 완료 - ID: {}, 제목: {}", response.getMeetingId(), response.getTitle());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("약속 확정 실패 - ID: {}, 에러: {}", request.getMeetingId(), e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
 
-    /**
-     * 약속 초대 응답 API (수락/거부)
-     * 이유: 초대받은 사용자가 약속 초대에 응답할 수 있도록 하기 위해
-     *
-     * @param meetingId 약속 ID
-     * @param userId 사용자 ID
-     * @param accept 수락 여부
-     * @return 응답 결과
-     */
-    @PostMapping("/{meetingId}/respond")
-    public ResponseEntity<Object> respondToInvite(@PathVariable Long meetingId,
-                                                 @RequestParam Long userId,
-                                                 @RequestParam boolean accept) {
-        log.info("약속 초대 응답 요청 - 약속: {}, 사용자: {}, 수락: {}", meetingId, userId, accept);
-
-        try {
-            String result = meetingService.respondToInvite(meetingId, userId, accept);
-            log.info("약속 초대 응답 완료 - 약속: {}, 사용자: {}, 결과: {}", meetingId, userId, result);
-            return ResponseEntity.ok().body(new Object() {
-                public final String responseStatus = result;
-                public final String message = "초대 응답이 완료되었습니다";
-            });
-        } catch (Exception e) {
-            log.error("약속 초대 응답 실패 - 약속: {}, 사용자: {}, 에러: {}", meetingId, userId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    /**
-     * 확정된 약속 목록 조회 API
-     * 이유: 확정된 약속들을 목록으로 조회할 수 있도록 하기 위해
-     *
-     * @param userId 사용자 ID
-     * @return 확정된 약속 목록
-     */
-    @GetMapping("/confirmed")
-    public ResponseEntity<Object> getConfirmedMeetings(@RequestParam Long userId) {
-        log.info("확정된 약속 목록 조회 요청 - 사용자: {}", userId);
-
-        try {
-            var meetings = meetingService.getConfirmedMeetings(userId);
-            return ResponseEntity.ok().body(new Object() {
-                public final List<MeetingResponse> meetingList = meetings;
-                public final int totalCount = meetings.size();
-            });
-        } catch (Exception e) {
-            log.error("확정된 약속 목록 조회 실패 - 사용자: {}, 에러: {}", userId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
 
     /**
      * 약속 정보 수정 API
@@ -156,8 +88,10 @@ public class MeetingController {
      */
     @PatchMapping("/{meetingId}")
     public ResponseEntity<Object> updateMeeting(@PathVariable Long meetingId,
-                                              @Valid @RequestBody MeetingUpdateRequest request) {
-        log.info("약속 수정 요청 - ID: {}, 수정 필드: {}", meetingId, request);
+                                              @Valid @RequestBody MeetingUpdateRequest request,
+                                              @RequestHeader("X-User-ID") Long userId) {
+        log.info("약속 수정 요청 - 약속ID: {}, 호스트ID: {}, 수정필드: 제목={}, 시간={}", 
+                meetingId, userId, request.getTitle(), request.getScheduledAt());
 
         // 유효성 검증
         if (!meetingValidator.isValidUpdateRequest(request)) {
@@ -165,9 +99,9 @@ public class MeetingController {
         }
 
         try {
-            boolean updated = meetingService.updateMeeting(meetingId, request);
-            if (updated) {
-                log.info("약속 수정 완료 - ID: {}", meetingId);
+            MeetingUpdateResponse updateResponse = meetingService.updateMeeting(meetingId, request);
+            if (updateResponse.isUpdated()) {
+                log.info("약속 수정 완료 - 약속ID: {}", meetingId);
                 return ResponseEntity.ok().body(new Object() {
                     public final boolean updated = true;
                 });
@@ -175,7 +109,7 @@ public class MeetingController {
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
-            log.error("약속 수정 실패 - ID: {}, 에러: {}", meetingId, e.getMessage(), e);
+            log.error("약속 수정 실패 - 약속ID: {}, 에러: {}", meetingId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -188,17 +122,18 @@ public class MeetingController {
      * @return 취소 결과
      */
     @PostMapping("/{meetingId}/cancel")
-    public ResponseEntity<Object> cancelMeeting(@PathVariable Long meetingId) {
-        log.info("약속 취소 요청 - ID: {}", meetingId);
+    public ResponseEntity<Object> cancelMeeting(@PathVariable Long meetingId,
+                                               @RequestHeader("X-User-ID") Long userId) {
+        log.info("약속 취소 요청 - 약속ID: {}, 호스트ID: {}", meetingId, userId);
 
         try {
             String result = meetingService.cancelMeeting(meetingId);
-            log.info("약속 취소 완료 - ID: {}, 상태: {}", meetingId, result);
+            log.info("약속 취소 완료 - 약속ID: {}, 상태: {}", meetingId, result);
             return ResponseEntity.ok().body(new Object() {
-                public final String cancelStatus = result;
+                public final String status = result;
             });
         } catch (Exception e) {
-            log.error("약속 취소 실패 - ID: {}, 에러: {}", meetingId, e.getMessage(), e);
+            log.error("약속 취소 실패 - 약속ID: {}, 에러: {}", meetingId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -212,9 +147,11 @@ public class MeetingController {
      * @return 초대 결과
      */
     @PostMapping("/{meetingId}/invites")
-    public ResponseEntity<Object> inviteParticipants(@PathVariable Long meetingId,
-                                                   @Valid @RequestBody MeetingInviteRequest request) {
-        log.info("약속 초대 요청 - ID: {}, 초대 대상: {}", meetingId, request);
+    public ResponseEntity<MeetingInviteResponse> inviteParticipants(@PathVariable Long meetingId,
+                                                                  @Valid @RequestBody MeetingInviteRequest request,
+                                                                  @RequestHeader("X-User-ID") Long userId) {
+        log.info("약속 초대 요청 - 약속ID: {}, 호스트ID: {}, 초대대상: {}명", meetingId, userId, 
+                request.getUserIds() != null ? request.getUserIds().size() : 0);
 
         // 유효성 검증
         if (!meetingValidator.isValidInviteRequest(request)) {
@@ -222,11 +159,11 @@ public class MeetingController {
         }
 
         try {
-            Object response = meetingService.inviteParticipants(meetingId, request);
-            log.info("약속 초대 완료 - ID: {}", meetingId);
+            MeetingInviteResponse response = meetingService.inviteParticipants(meetingId, request, userId);
+            log.info("약속 초대 완료 - 약속ID: {}, 초대성공: {}명", meetingId, response.getInvited().size());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("약속 초대 실패 - ID: {}, 에러: {}", meetingId, e.getMessage(), e);
+            log.error("약속 초대 실패 - 약속ID: {}, 에러: {}", meetingId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -239,17 +176,18 @@ public class MeetingController {
      * @return 참가 결과
      */
     @PostMapping("/{meetingId}/join")
-    public ResponseEntity<Object> joinMeeting(@PathVariable Long meetingId) {
-        log.info("약속 참가 요청 - ID: {}", meetingId);
+    public ResponseEntity<Object> joinMeeting(@PathVariable Long meetingId,
+                                             @RequestHeader("X-User-ID") Long userId) {
+        log.info("약속 참가 요청 - 약속ID: {}, 사용자ID: {}", meetingId, userId);
 
         try {
-            String result = meetingService.joinMeeting(meetingId);
-            log.info("약속 참가 완료 - ID: {}, 상태: {}", meetingId, result);
+            String result = meetingService.joinMeeting(meetingId, userId);
+            log.info("약속 참가 완료 - 약속ID: {}, 사용자ID: {}, 상태: {}", meetingId, userId, result);
             return ResponseEntity.ok().body(new Object() {
-                public final String joinStatus = result;
+                public final String status = result;
             });
         } catch (Exception e) {
-            log.error("약속 참가 실패 - ID: {}, 에러: {}", meetingId, e.getMessage(), e);
+            log.error("약속 참가 실패 - 약속ID: {}, 사용자ID: {}, 에러: {}", meetingId, userId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -262,17 +200,18 @@ public class MeetingController {
      * @return 나가기 결과
      */
     @PostMapping("/{meetingId}/leave")
-    public ResponseEntity<Object> leaveMeeting(@PathVariable Long meetingId) {
-        log.info("약속 나가기 요청 - ID: {}", meetingId);
+    public ResponseEntity<Object> leaveMeeting(@PathVariable Long meetingId,
+                                              @RequestHeader("X-User-ID") Long userId) {
+        log.info("약속 나가기 요청 - 약속ID: {}, 사용자ID: {}", meetingId, userId);
 
         try {
-            String result = meetingService.leaveMeeting(meetingId);
-            log.info("약속 나가기 완료 - ID: {}, 상태: {}", meetingId, result);
+            String result = meetingService.leaveMeeting(meetingId, userId);
+            log.info("약속 나가기 완료 - 약속ID: {}, 사용자ID: {}, 상태: {}", meetingId, userId, result);
             return ResponseEntity.ok().body(new Object() {
-                public final String leaveStatus = result;
+                public final String status = result;
             });
         } catch (Exception e) {
-            log.error("약속 나가기 실패 - ID: {}, 에러: {}", meetingId, e.getMessage(), e);
+            log.error("약속 나가기 실패 - 약속ID: {}, 사용자ID: {}, 에러: {}", meetingId, userId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -285,14 +224,15 @@ public class MeetingController {
      * @return 참가자 목록
      */
     @GetMapping("/{meetingId}/participants")
-    public ResponseEntity<Object> getParticipants(@PathVariable Long meetingId) {
-        log.info("참가자 목록 조회 요청 - ID: {}", meetingId);
+    public ResponseEntity<MeetingParticipantsResponse> getParticipants(@PathVariable Long meetingId) {
+        log.info("참가자 목록 조회 요청 - 약속ID: {}", meetingId);
 
         try {
-            Object response = meetingService.getParticipants(meetingId);
+            MeetingParticipantsResponse response = meetingService.getParticipants(meetingId);
+            log.info("참가자 목록 조회 완료 - 약속ID: {}, 참가자수: {}명", meetingId, response.getItems().size());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("참가자 목록 조회 실패 - ID: {}, 에러: {}", meetingId, e.getMessage(), e);
+            log.error("참가자 목록 조회 실패 - 약속ID: {}, 에러: {}", meetingId, e.getMessage(), e);
             return ResponseEntity.notFound().build();
         }
     }

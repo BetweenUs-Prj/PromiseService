@@ -78,7 +78,7 @@ public class Friendship {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    private UserProfile user;
+    private User user;
 
     /**
      * 친구와의 관계
@@ -86,5 +86,5 @@ public class Friendship {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "friend_id", insertable = false, updatable = false)
-    private UserProfile friend;
+    private User friend;
 }

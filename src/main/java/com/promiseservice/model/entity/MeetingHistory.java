@@ -84,5 +84,5 @@ public class MeetingHistory {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "action_by", insertable = false, updatable = false)
-    private UserProfile actionByUser;
+    private User actionByUser;
 }
