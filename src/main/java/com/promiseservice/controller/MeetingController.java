@@ -46,7 +46,7 @@ public class MeetingController {
         }
 
         try {
-            MeetingResponse response = meetingService.createMeeting(request);
+            MeetingResponse response = meetingService.createMeeting(request, userId);
             log.info("약속 생성 완료 - ID: {}, 상태: {}", response.getMeetingId(), response.getStatus());
             return ResponseEntity.ok(response);
         } catch (Exception e) {

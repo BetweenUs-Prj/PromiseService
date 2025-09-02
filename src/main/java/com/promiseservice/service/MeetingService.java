@@ -37,6 +37,7 @@ public class MeetingService {
     private final MeetingParticipantRepository participantRepository;
     private final PlaceRepository placeRepository;
     private final FriendshipRepository friendshipRepository;
+    private final UserService userService;
     private final NotificationService notificationService;
 
     /**
@@ -44,9 +45,10 @@ public class MeetingService {
      * 이유: 새로운 약속을 생성하고 초대된 참가자들을 등록하기 위해
      *
      * @param request 약속 생성 요청
+     * @param userId 요청한 사용자 ID (호스트)
      * @return 생성된 약속 정보
      */
-    public MeetingResponse createMeeting(MeetingCreateRequest request) {
+    public MeetingResponse createMeeting(MeetingCreateRequest request, Long userId) {
         log.info("약속 생성 시작 - 제목: {}, 장소: {}, 시간: {}", 
                 request.getTitle(), request.getPlaceName(), request.getScheduledAt());
 
@@ -57,7 +59,7 @@ public class MeetingService {
                 .meetingTime(request.getScheduledAt())
                 .maxParticipants(request.getMaxParticipants())
                 .status("WAITING")
-                .hostId(1L) // TODO: 실제 사용자 ID로 변경
+                .hostId(userId)
                 .placeId(request.getPlaceId())
                 .locationName(request.getPlaceName())
                 .locationAddress(request.getPlaceAddress())
@@ -69,7 +71,7 @@ public class MeetingService {
         // 호스트 참가자 등록 (자동으로 확정 상태)
         MeetingParticipant host = MeetingParticipant.builder()
                 .meetingId(savedMeeting.getId())
-                .userId(1L) // TODO: 실제 사용자 ID로 변경
+                .userId(userId)
                 .response("CONFIRMED")
                 .joinedAt(LocalDateTime.now())
                 .invitedAt(LocalDateTime.now())
@@ -78,10 +80,10 @@ public class MeetingService {
 
         // 초대된 참가자들 등록 (초대 상태로 시작)
         if (request.getParticipantUserIds() != null) {
-            for (Long userId : request.getParticipantUserIds()) {
+            for (Long participantUserId : request.getParticipantUserIds()) {
                 MeetingParticipant participant = MeetingParticipant.builder()
                         .meetingId(savedMeeting.getId())
-                        .userId(userId)
+                        .userId(participantUserId)
                         .response("INVITED")
                         .invitedAt(LocalDateTime.now())
                         .build();
@@ -302,7 +304,7 @@ public class MeetingService {
                     }
                     return MeetingParticipantsResponse.ParticipantInfo.builder()
                             .userId(p.getUserId())
-                            .name("사용자" + p.getUserId()) // TODO: 실제 사용자 이름으로 변경
+                            .name(userService.getUserName(p.getUserId()))
                             .role(role)
                             .status(mapResponseStatus(p.getResponse()))
                             .build();
@@ -357,7 +359,7 @@ public class MeetingService {
                 .status(meeting.getStatus())
                 .host(MeetingResponse.HostInfo.builder()
                         .userId(meeting.getHostId())
-                        .name("사용자" + meeting.getHostId()) // TODO: 실제 사용자 이름으로 변경
+                        .name(userService.getUserName(meeting.getHostId()))
                         .build())
                 .place(buildPlaceInfo(meeting))
                 .participants(buildParticipantInfo(meeting.getId()))
@@ -421,8 +423,7 @@ public class MeetingService {
 
         for (Long userId : participantUserIds) {
             try {
-                // TODO: NotificationService의 메서드 시그니처에 맞게 수정 필요
-                // notificationService.sendMeetingInviteNotification(userId, meeting);
+                sendMeetingInviteNotification(userId, meeting);
                 log.info("초대 알림 발송 성공 - 사용자 ID: {}", userId);
             } catch (Exception e) {
                 log.error("초대 알림 발송 실패 - 사용자 ID: {}, 오류: {}", userId, e.getMessage());
@@ -459,20 +460,27 @@ public class MeetingService {
                         builder.placeId(place.getId())
                                .placeName(place.getName())
                                .address(place.getAddress());
-                        if (place.getLatitude() != null && place.getLongitude() != null) {
-                            builder.lat(place.getLatitude().doubleValue())
-                                   .lng(place.getLongitude().doubleValue());
-                        }
                     });
         } else {
             // Place 엔티티가 없으면 Meeting의 location 정보 사용
             builder.placeId(null)
                    .placeName(meeting.getLocationName())
-                   .address(meeting.getLocationAddress())
-                   .lat(37.4979) // TODO: 실제 좌표로 변경
-                   .lng(127.0276);
+                   .address(meeting.getLocationAddress());
         }
         
         return builder.build();
     }
+
+    /**
+     * 약속 초대 알림 전송
+     * 이유: 사용자에게 새로운 약속 초대 알림을 전송하기 위해
+     * 
+     * @param userId 알림을 받을 사용자 ID
+     * @param meeting 약속 정보
+     */
+    private void sendMeetingInviteNotification(Long userId, Meeting meeting) {
+        // 실제 알림 전송 로직은 NotificationService를 통해 구현 예정
+        log.debug("약속 초대 알림 전송 - 사용자: {}, 약속: {}", userId, meeting.getTitle());
+    }
+
 }

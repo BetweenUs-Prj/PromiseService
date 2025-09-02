@@ -45,15 +45,6 @@ public interface MeetingParticipantRepository extends JpaRepository<MeetingParti
      */
     Optional<MeetingParticipant> findByMeetingIdAndUserId(Long meetingId, Long userId);
 
-    /**
-     * 특정 약속의 특정 상태를 가진 참가자 목록을 조회
-     * 이유: 특정 상태의 참가자들을 조회하기 위해
-     *
-     * @param meetingId 약속 ID
-     * @param status 참가자 상태
-     * @return 해당 상태의 참가자 목록
-     */
-    List<MeetingParticipant> findByMeetingIdAndStatus(Long meetingId, String status);
 
     /**
      * 특정 약속의 특정 응답을 가진 참가자 목록을 조회

@@ -93,12 +93,6 @@ public class Meeting {
     @Column(name = "location_address", length = 500)
     private String locationAddress;
 
-    /**
-     * 약속 장소 좌표 정보
-     * 이유: 지도 표시나 경로 안내를 위한 좌표 정보를 저장하기 위해
-     */
-    @Column(name = "location_coordinates", columnDefinition = "TEXT")
-    private String locationCoordinates;
 
     /**
      * 장소 ID

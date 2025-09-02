@@ -81,8 +81,6 @@ public class MeetingResponse {
         private Long placeId;
         private String placeName;
         private String address;
-        private Double lat;
-        private Double lng;
     }
 
     /**

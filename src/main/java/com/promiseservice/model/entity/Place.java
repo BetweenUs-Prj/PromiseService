@@ -50,19 +50,6 @@ public class Place {
     @Column(name = "address", length = 500)
     private String address;
 
-    /**
-     * 위도
-     * 이유: 지도 표시와 위치 기반 서비스를 위한 정확한 좌표 정보 저장
-     */
-    @Column(name = "latitude", precision = 10, scale = 8)
-    private BigDecimal latitude;
-
-    /**
-     * 경도
-     * 이유: 지도 표시와 위치 기반 서비스를 위한 정확한 좌표 정보 저장
-     */
-    @Column(name = "longitude", precision = 11, scale = 8)
-    private BigDecimal longitude;
 
     /**
      * 장소 카테고리

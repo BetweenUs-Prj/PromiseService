@@ -117,17 +117,6 @@ public class MeetingCreateResponse {
          */
         private String address;
 
-        /**
-         * 장소 위도 좌표
-         * 이유: 지도 서비스 연동 및 위치 기반 기능(거리 계산, 경로 안내 등)을 제공하기 위해
-         */
-        private Double lat;
-
-        /**
-         * 장소 경도 좌표
-         * 이유: 지도 서비스 연동 및 위치 기반 기능(거리 계산, 경로 안내 등)을 제공하기 위해
-         */
-        private Double lng;
 
         /**
          * 장소 카테고리 (선택사항)
