@@ -38,7 +38,6 @@ public class MeetingService {
     private final PlaceRepository placeRepository;
     private final FriendshipRepository friendshipRepository;
     private final UserService userService;
-    private final NotificationService notificationService;
 
     /**
      * 약속 생성
@@ -91,8 +90,6 @@ public class MeetingService {
             }
         }
 
-        // 초대 알림 발송
-        sendInviteNotifications(savedMeeting, request);
 
         // 응답 생성
         return buildMeetingResponse(savedMeeting);
@@ -231,14 +228,10 @@ public class MeetingService {
             }
         }
 
-        // 초대 알림 발송
-        if (request.isSendKakao() && !invited.isEmpty()) {
-            sendInviteNotifications(meeting, request.getUserIds());
-        }
 
         return MeetingInviteResponse.builder()
                 .invited(invited)
-                .kakaoSent(request.isSendKakao())
+                .kakaoSent(false)
                 .errors(errors)
                 .build();
     }
@@ -407,44 +400,6 @@ public class MeetingService {
         return dbStatus;
     }
 
-    /**
-     * 초대 알림 발송
-     * 이유: 초대된 참가자들에게 알림을 보내기 위해
-     *
-     * @param meeting 약속 정보
-     * @param participantUserIds 참가자 사용자 ID 목록
-     */
-    private void sendInviteNotifications(Meeting meeting, List<Long> participantUserIds) {
-        if (participantUserIds == null || participantUserIds.isEmpty()) {
-            return;
-        }
-
-        log.info("초대 알림 발송 시작 - 약속 ID: {}, 참가자 수: {}", meeting.getId(), participantUserIds.size());
-
-        for (Long userId : participantUserIds) {
-            try {
-                sendMeetingInviteNotification(userId, meeting);
-                log.info("초대 알림 발송 성공 - 사용자 ID: {}", userId);
-            } catch (Exception e) {
-                log.error("초대 알림 발송 실패 - 사용자 ID: {}, 오류: {}", userId, e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * 초대 알림 발송 (MeetingCreateRequest용)
-     * 이유: 약속 생성 시 초대 알림을 보내기 위해
-     *
-     * @param meeting 약속 정보
-     * @param request 약속 생성 요청
-     */
-    private void sendInviteNotifications(Meeting meeting, MeetingCreateRequest request) {
-        if (request.getParticipantUserIds() == null || request.getParticipantUserIds().isEmpty()) {
-            return;
-        }
-
-        sendInviteNotifications(meeting, request.getParticipantUserIds());
-    }
 
     /**
      * 장소 정보 빌드
@@ -471,16 +426,5 @@ public class MeetingService {
         return builder.build();
     }
 
-    /**
-     * 약속 초대 알림 전송
-     * 이유: 사용자에게 새로운 약속 초대 알림을 전송하기 위해
-     * 
-     * @param userId 알림을 받을 사용자 ID
-     * @param meeting 약속 정보
-     */
-    private void sendMeetingInviteNotification(Long userId, Meeting meeting) {
-        // 실제 알림 전송 로직은 NotificationService를 통해 구현 예정
-        log.debug("약속 초대 알림 전송 - 사용자: {}, 약속: {}", userId, meeting.getTitle());
-    }
 
 }

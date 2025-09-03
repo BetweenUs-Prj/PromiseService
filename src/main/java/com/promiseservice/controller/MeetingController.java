@@ -159,7 +159,7 @@ public class MeetingController {
         }
 
         try {
-            MeetingInviteResponse response = meetingService.inviteParticipants(meetingId, request, userId);
+            MeetingInviteResponse response = meetingService.inviteParticipRants(meetingId, request, userId);
             log.info("약속 초대 완료 - 약속ID: {}, 초대성공: {}명", meetingId, response.getInvited().size());
             return ResponseEntity.ok(response);
         } catch (Exception e) {

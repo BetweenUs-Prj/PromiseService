@@ -38,3 +38,4 @@ out/
 
 .cursor/
 CLAUDE.md
+.env

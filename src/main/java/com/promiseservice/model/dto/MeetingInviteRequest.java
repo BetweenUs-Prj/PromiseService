@@ -36,20 +36,6 @@ public class MeetingInviteRequest {
     @Size(max = 50, message = "한 번에 초대할 수 있는 카카오 사용자는 50명을 초과할 수 없습니다")
     private List<String> kakaoIds;
 
-    /**
-     * 카카오 알림 발송 여부
-     * 이유: 초대 시 카카오톡 알림을 자동으로 발송할지 여부를 사용자가 선택할 수 있도록 하기 위해
-     */
-    @Builder.Default
-    private Boolean sendKakao = true;
-
-    /**
-     * 카카오 알림 발송 여부 확인
-     * 이유: 카카오 알림 발송 여부를 boolean 값으로 반환하기 위해
-     */
-    public boolean isSendKakao() {
-        return sendKakao != null && sendKakao;
-    }
 
     /**
      * 초대 메시지 (선택사항)
