@@ -75,8 +75,26 @@ public class MeetingController {
         }
     }
 
-
-
+    /**
+     * 사용자 약속 목록 조회 API
+     * 이유: 사용자가 참여하고 있는 모든 약속의 목록을 조회할 수 있도록 하기 위해
+     *
+     * @param userId 사용자 ID (헤더에서 가져옴)
+     * @return 사용자의 약속 목록
+     */
+    @GetMapping
+    public ResponseEntity<List<MeetingResponse>> getUserMeetings(@RequestHeader("X-User-ID") Long userId) {
+        log.info("사용자 약속 목록 조회 요청 - 사용자ID: {}", userId);
+        
+        try {
+            List<MeetingResponse> meetings = meetingService.getUserMeetings(userId);
+            log.info("사용자 약속 목록 조회 완료 - 사용자ID: {}, 약속수: {}개", userId, meetings.size());
+            return ResponseEntity.ok(meetings);
+        } catch (Exception e) {
+            log.error("사용자 약속 목록 조회 실패 - 사용자ID: {}, 에러: {}", userId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 
     /**
      * 약속 정보 수정 API
@@ -159,7 +177,7 @@ public class MeetingController {
         }
 
         try {
-            MeetingInviteResponse response = meetingService.inviteParticipRants(meetingId, request, userId);
+            MeetingInviteResponse response = meetingService.inviteParticipants(meetingId, request, userId);
             log.info("약속 초대 완료 - 약속ID: {}, 초대성공: {}명", meetingId, response.getInvited().size());
             return ResponseEntity.ok(response);
         } catch (Exception e) {

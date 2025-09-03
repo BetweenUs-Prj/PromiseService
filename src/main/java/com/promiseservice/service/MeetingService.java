@@ -110,6 +110,30 @@ public class MeetingService {
     }
 
     /**
+     * 사용자 약속 목록 조회
+     * 이유: 사용자가 참여하고 있는 모든 약속의 목록을 조회하기 위해
+     *
+     * @param userId 사용자 ID
+     * @return 사용자 약속 목록
+     */
+    public List<MeetingResponse> getUserMeetings(Long userId) {
+        log.info("사용자 약속 목록 조회 시작 - 사용자ID: {}", userId);
+        
+        // 사용자가 참여하고 있는 모든 약속을 조회 (호스트이거나 참가자인 경우)
+        List<MeetingParticipant> participations = participantRepository.findByUserId(userId);
+        
+        List<MeetingResponse> meetings = participations.stream()
+                .map(participation -> {
+                    Meeting meeting = participation.getMeeting();
+                    return buildMeetingResponse(meeting);
+                })
+                .collect(Collectors.toList());
+        
+        log.info("사용자 약속 목록 조회 완료 - 사용자ID: {}, 약속수: {}개", userId, meetings.size());
+        return meetings;
+    }
+
+    /**
      * 약속 수정
      * 이유: 기존 약속의 정보를 수정하기 위해
      *
