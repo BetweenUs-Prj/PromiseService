@@ -3,8 +3,6 @@ package com.promiseservice.service;
 import com.promiseservice.model.dto.*;
 import com.promiseservice.model.entity.Meeting;
 import com.promiseservice.model.entity.MeetingParticipant;
-import com.promiseservice.model.entity.Place;
-import com.promiseservice.model.entity.Friendship;
 import com.promiseservice.repository.MeetingRepository;
 import com.promiseservice.repository.MeetingParticipantRepository;
 import com.promiseservice.repository.PlaceRepository;
