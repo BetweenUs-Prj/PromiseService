@@ -1,5 +1,6 @@
 package com.promiseservice.model.entity;
 
+import com.promiseservice.model.enums.PlaceStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +10,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -65,6 +65,29 @@ public class Place {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
+
+    /**
+     * 장소 상태
+     * 이유: 장소의 생명주기를 관리하기 위해 (DRAFT/ACTIVE/INACTIVE)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private PlaceStatus status = PlaceStatus.DRAFT;
+
+    /**
+     * 외부 소스
+     * 이유: 카카오맵, 네이버맵 등 외부 API에서 가져온 장소인지 구분하기 위해
+     */
+    @Column(name = "source", length = 20)
+    private String source;
+
+    /**
+     * 외부 ID
+     * 이유: 외부 API의 장소 ID를 저장하여 중복 생성을 방지하기 위해
+     */
+    @Column(name = "external_id", length = 100)
+    private String externalId;
 
     /**
      * 생성 시각

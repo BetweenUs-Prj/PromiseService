@@ -21,6 +21,18 @@ import java.util.List;
 public class MeetingParticipantsResponse {
 
     /**
+     * 약속 ID
+     * 이유: 어떤 약속의 참가자 목록인지 식별하기 위해
+     */
+    private Long meetingId;
+
+    /**
+     * 최대 참여 인원
+     * 이유: 약속의 최대 참여 인원을 표시하기 위해
+     */
+    private Integer maxParticipants;
+
+    /**
      * 참가자 정보 목록
      * 이유: 참가자들의 상세 정보를 제공하기 위해
      */
@@ -59,5 +71,11 @@ public class MeetingParticipantsResponse {
          * 이유: 참가자의 현재 상태를 표시하기 위해
          */
         private String status;
+
+        /**
+         * 참가 응답 상태
+         * 이유: 프론트엔드가 기대하는 응답 상태를 표시하기 위해 (PENDING/CONFIRMED/DECLINED)
+         */
+        private String response;
     }
 }

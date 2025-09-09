@@ -38,20 +38,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByNameContaining(@Param("name") String name);
 
     /**
-     * 전화번호로 사용자 조회
-     * 이유: 전화번호를 통한 사용자 인증이나 조회 기능을 제공하기 위해
+     * 제공자 ID로 사용자 조회
+     * 이유: OAuth 제공자 ID를 통한 사용자 조회를 위해
      * 
-     * @param phoneNumber 전화번호
-     * @return 해당 전화번호를 가진 사용자
+     * @param providerId 제공자 ID
+     * @return 해당 제공자 ID를 가진 사용자
      */
-    User findByPhoneNumber(String phoneNumber);
-
-    /**
-     * 위치 기반 사용자 검색
-     * 이유: 특정 지역의 사용자들을 조회하기 위해
-     * 
-     * @param location 위치
-     * @return 해당 위치의 사용자 목록
-     */
-    List<User> findByLocationContaining(String location);
+    User findByProviderId(String providerId);
 }

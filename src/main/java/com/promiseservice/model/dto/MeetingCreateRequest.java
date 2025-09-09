@@ -34,7 +34,6 @@ public class MeetingCreateRequest {
      * 장소 ID (외부 장소 서비스 연동용)
      * 이유: 장소 기반 약속 생성 시 외부 장소 서비스와 연동하여 정확한 장소 정보를 가져오기 위해
      */
-    @NotNull(message = "장소 ID는 필수입니다")
     @Min(value = 1, message = "장소 ID는 1 이상이어야 합니다")
     private Long placeId;
 
@@ -51,6 +50,20 @@ public class MeetingCreateRequest {
      */
     @Size(max = 500, message = "장소 주소는 500자를 초과할 수 없습니다")
     private String placeAddress;
+
+    /**
+     * 외부 장소 소스 (카카오맵, 네이버맵 등)
+     * 이유: 외부 API에서 가져온 장소인지 구분하기 위해
+     */
+    @Size(max = 20, message = "외부 소스는 20자를 초과할 수 없습니다")
+    private String externalPlaceSource;
+
+    /**
+     * 외부 장소 ID
+     * 이유: 외부 API의 장소 ID를 저장하여 중복 생성을 방지하기 위해
+     */
+    @Size(max = 100, message = "외부 ID는 100자를 초과할 수 없습니다")
+    private String externalPlaceId;
 
     /**
      * 약속 예정 시간

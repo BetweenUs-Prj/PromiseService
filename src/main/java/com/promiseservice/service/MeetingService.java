@@ -3,17 +3,20 @@ package com.promiseservice.service;
 import com.promiseservice.model.dto.*;
 import com.promiseservice.model.entity.Meeting;
 import com.promiseservice.model.entity.MeetingParticipant;
+import com.promiseservice.model.entity.Place;
+import com.promiseservice.model.entity.User;
+import com.promiseservice.model.enums.PlaceStatus;
 import com.promiseservice.repository.MeetingRepository;
 import com.promiseservice.repository.MeetingParticipantRepository;
 import com.promiseservice.repository.PlaceRepository;
 import com.promiseservice.repository.FriendshipRepository;
+import com.promiseservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
@@ -35,6 +38,7 @@ public class MeetingService {
     private final MeetingParticipantRepository participantRepository;
     private final PlaceRepository placeRepository;
     private final FriendshipRepository friendshipRepository;
+    private final UserRepository userRepository;
     private final UserService userService;
 
     /**
@@ -46,52 +50,115 @@ public class MeetingService {
      * @return 생성된 약속 정보
      */
     public MeetingResponse createMeeting(MeetingCreateRequest request, Long userId) {
-        log.info("약속 생성 시작 - 제목: {}, 장소: {}, 시간: {}", 
+        log.info("약속 생성 시작 - 제목: {}, 장소: {}, 시간: {}",
                 request.getTitle(), request.getPlaceName(), request.getScheduledAt());
 
-        // 약속 엔티티 생성 (대기 중 상태로 시작)
-        Meeting meeting = Meeting.builder()
-                .title(request.getTitle())
-                .description(request.getMemo())
-                .meetingTime(request.getScheduledAt())
-                .maxParticipants(request.getMaxParticipants())
-                .status("WAITING")
-                .hostId(userId)
-                .placeId(request.getPlaceId())
-                .locationName(request.getPlaceName())
-                .locationAddress(request.getPlaceAddress())
-                .build();
+        // 호스트 사용자 ID 검증 및 자동 생성
+        if (!userRepository.existsById(userId)) {
+            log.warn("사용자 ID {}가 존재하지 않습니다. 자동으로 생성합니다.", userId);
+            User newUser = User.builder()
+                    .name("사용자 " + userId)
+                    .profileImage("https://example.com/default-avatar.jpg")
+                    .providerId("system_" + userId)
+                    .build();
+            User savedUser = userRepository.save(newUser);
+            log.info("사용자 ID {} 자동 생성 완료 (실제 ID: {})", userId, savedUser.getId());
+            // 실제 생성된 ID로 업데이트
+            userId = savedUser.getId();
+        }
+
+        Place place = resolvePlace(request);
+
+        Meeting meeting = new Meeting();
+        meeting.setTitle(request.getTitle());
+        meeting.setMeetingTime(request.getScheduledAt());
+        meeting.setMaxParticipants(request.getMaxParticipants() != null ? request.getMaxParticipants() : 10);
+        meeting.setPlace(place);                          // FK 안전
+        // place_id가 null이면 "장소 미정"으로 설정
+        meeting.setPlaceId(place != null ? place.getId() : null);
+        meeting.setLocationName(place != null ? place.getName() : "장소 미정");
+        meeting.setLocationAddress(place != null ? place.getAddress() : "장소 미정");
+        meeting.setHostId(userId);
+        meeting.setStatus("WAITING");
 
         Meeting savedMeeting = meetingRepository.save(meeting);
         log.info("약속 저장 완료 - ID: {}", savedMeeting.getId());
 
-        // 호스트 참가자 등록 (자동으로 확정 상태)
-        MeetingParticipant host = MeetingParticipant.builder()
-                .meetingId(savedMeeting.getId())
-                .userId(userId)
-                .response("CONFIRMED")
-                .joinedAt(LocalDateTime.now())
-                .invitedAt(LocalDateTime.now())
-                .build();
-        participantRepository.save(host);
-
-        // 초대된 참가자들 등록 (초대 상태로 시작)
-        if (request.getParticipantUserIds() != null) {
-            for (Long participantUserId : request.getParticipantUserIds()) {
-                MeetingParticipant participant = MeetingParticipant.builder()
+        // 호스트 자동 참가(확정)
+        participantRepository.save(
+                MeetingParticipant.builder()
                         .meetingId(savedMeeting.getId())
-                        .userId(participantUserId)
-                        .response("INVITED")
+                        .userId(userId)
+                        .response("CONFIRMED")
+                        .joinedAt(LocalDateTime.now())
                         .invitedAt(LocalDateTime.now())
-                        .build();
-                participantRepository.save(participant);
-            }
-        }
+                        .build()
+        );
 
-
-        // 응답 생성
         return buildMeetingResponse(savedMeeting);
     }
+
+    /**
+     * 장소 해결
+     * 이유: placeId가 있으면 조회하고, 없으면 자동으로 장소를 생성하기 위해
+     *
+     * @param request 약속 생성 요청
+     * @return 해결된 Place 엔티티
+     */
+    private Place resolvePlace(MeetingCreateRequest request) {
+        // 1) placeId 우선 사용
+        if (request.getPlaceId() != null) {
+            return placeRepository.findById(request.getPlaceId())
+                .orElse(null); // 없으면 null 반환 (응급 처치)
+        }
+        // 2) placeId 없으면 장소 최소 정보로 생성
+        return createMinimalPlaceFrom(request);
+    }
+
+    /**
+     * 최소 장소 정보로 장소 생성
+     * 이유: placeId가 없거나 유효하지 않을 때 자동으로 장소를 생성하기 위해
+     *
+     * @param request 약속 생성 요청
+     * @return 생성된 Place 엔티티
+     */
+    private Place createMinimalPlaceFrom(MeetingCreateRequest request) {
+        // 외부 키(kakao/naver 등) 매핑이 오면 upsert
+        if (request.getExternalPlaceSource() != null && request.getExternalPlaceId() != null) {
+            return placeRepository.findBySourceAndExternalId(
+                    request.getExternalPlaceSource(), request.getExternalPlaceId())
+                .orElseGet(() -> placeRepository.save(Place.builder()
+                        .name(nvl(request.getPlaceName(), "미정 장소"))
+                        .address(nvl(request.getPlaceAddress(), "미정 주소"))
+                        .source(request.getExternalPlaceSource())
+                        .externalId(request.getExternalPlaceId())
+                        .isActive(false)            // 초기는 비활성/임시
+                        .status(PlaceStatus.DRAFT) // DRAFT로 표기
+                        .build()));
+        }
+        // 외부 키도 없으면 그냥 최소 정보로 생성
+        // placeName과 placeAddress가 모두 비어있어도 기본값으로 생성
+        return placeRepository.save(Place.builder()
+                .name(nvl(request.getPlaceName(), "미정 장소"))
+                .address(nvl(request.getPlaceAddress(), "미정 주소"))
+                .isActive(false)
+                .status(PlaceStatus.DRAFT)
+                .build());
+    }
+
+
+    /**
+     * null 체크 및 기본값 반환
+     * 이유: null 값을 안전하게 처리하기 위해
+     *
+     * @param value 체크할 값
+     * @param defaultValue 기본값
+     * @return 값이 null이면 기본값, 아니면 원래 값
+     */
+    private String nvl(String value, String defaultValue) {
+        return value != null ? value : defaultValue;
+    }
+
 
     /**
      * 약속 조회
@@ -202,7 +269,7 @@ public class MeetingService {
      * @return 초대 결과
      */
     public MeetingInviteResponse inviteParticipants(Long meetingId, MeetingInviteRequest request, Long hostUserId) {
-        Meeting meeting = meetingRepository.findById(meetingId)
+        meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new RuntimeException("약속을 찾을 수 없습니다: " + meetingId));
 
         List<MeetingInviteResponse.InvitedParticipant> invited = new ArrayList<>();
@@ -210,7 +277,26 @@ public class MeetingService {
 
         // 사용자 ID 목록으로 초대 (친구 관계 확인)
         if (request.getUserIds() != null) {
-            for (Long userId : request.getUserIds()) {
+            // 1) 사용자 ID 존재 여부 검증
+            List<Long> userIds = request.getUserIds();
+            long existingUserCount = userRepository.countByIdIn(userIds);
+            if (existingUserCount != userIds.size()) {
+                // 존재하지 않는 사용자 ID 찾기
+                List<Long> existingUserIds = userRepository.findAllById(userIds)
+                        .stream()
+                        .map(user -> user.getId())
+                        .collect(Collectors.toList());
+                List<Long> missingUserIds = userIds.stream()
+                        .filter(id -> !existingUserIds.contains(id))
+                        .collect(Collectors.toList());
+                errors.add("존재하지 않는 사용자 ID: " + missingUserIds);
+                return MeetingInviteResponse.builder()
+                        .invited(invited)
+                        .errors(errors)
+                        .build();
+            }
+
+            for (Long userId : userIds) {
                 // 친구 관계 확인
                 boolean isFriend = friendshipRepository.areFriends(hostUserId, userId);
                 if (!isFriend) {
@@ -313,20 +399,20 @@ public class MeetingService {
 
         List<MeetingParticipantsResponse.ParticipantInfo> items = participants.stream()
                 .map(p -> {
-                    String role = "MEMBER";
-                    if (meeting != null && meeting.getHostId().equals(p.getUserId())) {
-                        role = "HOST";
-                    }
+                    String role = (meeting != null && meeting.getHostId().equals(p.getUserId())) ? "HOST" : "GUEST";
                     return MeetingParticipantsResponse.ParticipantInfo.builder()
                             .userId(p.getUserId())
                             .name(userService.getUserName(p.getUserId()))
                             .role(role)
-                            .status(mapResponseStatus(p.getResponse()))
+                            // 🔁 프론트 기대 키: response (PENDING/CONFIRMED/DECLINED)
+                            .response(mapResponseForClient(p.getResponse()))
                             .build();
                 })
                 .collect(Collectors.toList());
 
         return MeetingParticipantsResponse.builder()
+                .meetingId(meetingId)                                 // 🔁 추가
+                .maxParticipants(meeting != null ? meeting.getMaxParticipants() : null) // 🔁 추가
                 .items(items)
                 .build();
     }
@@ -365,9 +451,6 @@ public class MeetingService {
      * @return 약속 응답
      */
     private MeetingResponse buildMeetingResponse(Meeting meeting) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        String formattedTime = meeting.getMeetingTime().format(formatter);
-
         return MeetingResponse.builder()
                 .meetingId(meeting.getId())
                 .title(meeting.getTitle())
@@ -407,6 +490,7 @@ public class MeetingService {
                 .collect(Collectors.toList());
     }
     
+
     /**
      * 응답 상태 매핑
      * 이유: 데이터베이스의 응답 상태를 API 스펙에 맞는 상태로 변환하기 위해
@@ -419,6 +503,18 @@ public class MeetingService {
         } else if ("CANCELLED".equals(dbStatus)) {
             return "LEFT";
         }
+        return dbStatus;
+    }
+
+    /**
+     * DB → 클라이언트 매핑
+     * 이유: 데이터베이스의 응답 상태를 프론트엔드가 기대하는 상태로 변환하기 위해
+     */
+    private String mapResponseForClient(String dbStatus) {
+        if ("INVITED".equals(dbStatus)) return "PENDING";
+        if ("CONFIRMED".equals(dbStatus)) return "CONFIRMED";
+        if ("CANCELLED".equals(dbStatus) || "LEFT".equals(dbStatus)) return "DECLINED";
+        // 그 외 값은 그대로
         return dbStatus;
     }
 
@@ -439,10 +535,10 @@ public class MeetingService {
                                .address(place.getAddress());
                     });
         } else {
-            // Place 엔티티가 없으면 Meeting의 location 정보 사용
+            // Place 엔티티가 없으면 Meeting의 location 정보 사용 (null이면 "장소 미정")
             builder.placeId(null)
-                   .placeName(meeting.getLocationName())
-                   .address(meeting.getLocationAddress());
+                   .placeName(meeting.getLocationName() != null ? meeting.getLocationName() : "장소 미정")
+                   .address(meeting.getLocationAddress() != null ? meeting.getLocationAddress() : "장소 미정");
         }
         
         return builder.build();

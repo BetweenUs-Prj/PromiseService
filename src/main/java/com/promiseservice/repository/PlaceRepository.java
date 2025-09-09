@@ -53,4 +53,11 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
      */
     @Query("SELECT p FROM Place p WHERE p.address LIKE %:address% AND p.isActive = true")
     List<Place> findByAddressContaining(@Param("address") String address);
+
+    /**
+     * 외부 소스와 외부 ID로 장소 조회
+     * 이유: 외부 API에서 가져온 장소의 중복 생성을 방지하기 위해
+     */
+    @Query("SELECT p FROM Place p WHERE p.source = :source AND p.externalId = :externalId")
+    Optional<Place> findBySourceAndExternalId(@Param("source") String source, @Param("externalId") String externalId);
 }
